@@ -10,7 +10,6 @@ export interface FacebookStoryCandidate {
 
 export interface FacebookPostTarget {
   postId: string
-  postUrl: string
 }
 
 function decodeJsonString(value: string): string {
@@ -74,7 +73,9 @@ export async function fetchFacebookMenu(target?: FacebookPostTarget): Promise<{
       viewport: { width: 1365, height: 1600 },
     })
     const page = await context.newPage()
-    const pageUrl = target?.postUrl ?? FACEBOOK_PAGE_URL
+    // The logged-out permalink page often omits embedded post data entirely.
+    // Load the Page feed and select the requested recent post from its embedded records.
+    const pageUrl = FACEBOOK_PAGE_URL
     await page.goto(pageUrl, { waitUntil: 'domcontentloaded', timeout: 45_000 })
     await page.waitForFunction(
       `document.documentElement.innerHTML.includes('"post_id"')`,

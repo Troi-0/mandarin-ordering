@@ -246,7 +246,7 @@ async function runFacebook() {
 
   const { candidate, image, mimeType } = await fetchFacebookMenu(
     benchmarkReference
-      ? { postId: benchmarkReference.source.postId, postUrl: benchmarkReference.source.postUrl }
+      ? { postId: benchmarkReference.source.postId }
       : undefined,
   )
   const publishedAt = new Date(candidate.creationTime * 1000).toISOString()

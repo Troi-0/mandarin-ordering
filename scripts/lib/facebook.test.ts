@@ -40,11 +40,9 @@ describe('Facebook embedded post parsing', () => {
 
     expect(selectFacebookCandidate(candidates, {
       postId: '111',
-      postUrl: 'https://www.facebook.com/permalink.php?story_fbid=111',
     })?.postId).toBe('111')
     expect(selectFacebookCandidate(candidates, {
       postId: '999',
-      postUrl: 'https://www.facebook.com/permalink.php?story_fbid=999',
     })).toBeUndefined()
   })
 })
