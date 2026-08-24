@@ -19,17 +19,6 @@ import { clearDraft, loadDraft, saveDraft } from './lib/storage.ts'
 
 type Notice = { kind: 'success' | 'error'; text: string } | null
 
-function afterRestaurantCutoff(now: Date = new Date()): boolean {
-  const parts = new Intl.DateTimeFormat('en-GB', {
-    timeZone: 'Europe/Sofia',
-    hour: '2-digit',
-    minute: '2-digit',
-    hourCycle: 'h23',
-  }).formatToParts(now)
-  const values = Object.fromEntries(parts.map((part) => [part.type, part.value]))
-  return Number(values.hour) * 60 + Number(values.minute) >= 12 * 60 + 30
-}
-
 function QuantityControl({
   item,
   quantity,
@@ -98,7 +87,6 @@ export function MenuApp({ menu }: { menu: Menu }) {
   const orderLines = useMemo(() => createOrderLines(menu, quantities), [menu, quantities])
   const itemCount = orderLines.reduce((sum, line) => sum + line.quantity, 0)
   const totalCents = orderLines.reduce((sum, line) => sum + line.lineTotalCents, 0)
-  const cutoffPassed = afterRestaurantCutoff()
 
   useEffect(() => {
     saveDraft({ date: menu.date, quantities, participantName, note })
@@ -238,9 +226,6 @@ export function MenuApp({ menu }: { menu: Menu }) {
         />
       </div>
 
-      {cutoffPassed && (
-        <p className="cutoff-warning">След 12:30 е — провери дали организаторът още приема избори.</p>
-      )}
       {notice && <p className={`notice notice--${notice.kind}`} role="status">{notice.text}</p>}
       <button className="share-button" type="button" onClick={shareOrder}>
         <span>Сподели избора</span><span aria-hidden="true">↗</span>
@@ -260,15 +245,18 @@ export function MenuApp({ menu }: { menu: Menu }) {
             Оригиналът във Facebook <span aria-hidden="true">↗</span>
           </a>
         </nav>
+        <aside className="important-banner" aria-labelledby="important-title">
+          <span aria-hidden="true">!</span>
+          <div>
+            <strong id="important-title">Важно</strong>
+            <p>Това е неофициален помощник за избор. Не представлява поръчка към Mandarin House.</p>
+          </div>
+        </aside>
         <div className="hero-grid" id="top">
           <div className="hero-copy">
             <span className="eyebrow eyebrow--light">Обедно меню · {formatBulgarianDate(menu.date)}</span>
             <h1>Какво ще<br />хапваш <em>днес?</em></h1>
             <p>Избери ястията си, виж точната сума и изпрати готовото обобщение.</p>
-            <div className="hero-note">
-              <span aria-hidden="true">◷</span>
-              <div><strong>Ресторантът приема поръчки до 12:30</strong><small>На място или доставка: 087 694 2024</small></div>
-            </div>
           </div>
           <div className="hero-plate" aria-hidden="true">
             <span className="plate-leaf plate-leaf--one" />
@@ -320,10 +308,6 @@ export function MenuApp({ menu }: { menu: Menu }) {
             </section>
           ))}
 
-          <aside className="disclaimer">
-            <strong>Важно</strong>
-            <p>Това е неофициален помощник за избор. Не представлява поръчка към Mandarin House.</p>
-          </aside>
         </section>
 
         <aside className="basket-panel" aria-label="Обобщение на избора">{basket}</aside>
