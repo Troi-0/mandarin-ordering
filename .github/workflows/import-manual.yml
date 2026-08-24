@@ -1,0 +1,76 @@
+name: Import manually uploaded menu
+
+on:
+  push:
+    branches: [master]
+    paths:
+      - manual-inbox/*.png
+      - manual-inbox/*.jpg
+      - manual-inbox/*.jpeg
+      - manual-inbox/*.webp
+  workflow_dispatch:
+    inputs:
+      image_path:
+        description: Repository path such as manual-inbox/2026-08-24.png
+        required: true
+        type: string
+
+permissions:
+  contents: write
+
+concurrency:
+  group: menu-import
+  cancel-in-progress: false
+
+jobs:
+  import:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v6
+        with:
+          fetch-depth: 2
+      - uses: actions/setup-node@v6
+        with:
+          node-version: 24
+          cache: npm
+      - run: npm ci
+      - name: Resolve inbox image
+        id: image
+        env:
+          MANUAL_PATH: ${{ inputs.image_path }}
+        run: |
+          if [ -n "$MANUAL_PATH" ]; then
+            IMAGE_PATH="$MANUAL_PATH"
+          else
+            IMAGE_PATH="$(git diff-tree --no-commit-id --name-only -r "$GITHUB_SHA" -- manual-inbox | tail -n 1)"
+          fi
+          case "$IMAGE_PATH" in
+            manual-inbox/*.png|manual-inbox/*.jpg|manual-inbox/*.jpeg|manual-inbox/*.webp) ;;
+            *) echo "No supported manual-inbox image found"; exit 1 ;;
+          esac
+          test -f "$IMAGE_PATH"
+          echo "path=$IMAGE_PATH" >> "$GITHUB_OUTPUT"
+      - name: Extract and verify public menu image
+        id: importer
+        continue-on-error: true
+        env:
+          GEMINI_API_KEY: ${{ secrets.GEMINI_API_KEY }}
+        run: npm run import:manual -- "${{ steps.image.outputs.path }}"
+      - name: Commit changed menu or review draft
+        if: always()
+        run: |
+          git config user.name "mandarin-menu-bot"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add data/current-menu.json data/menus data/review
+          if git diff --cached --quiet; then
+            echo "No menu-data change"
+          else
+            git commit -m "data: process manual menu image"
+            git push
+          fi
+      - name: Keep rejected extraction unpublished
+        if: steps.importer.outcome == 'failure'
+        run: |
+          echo "Import or verification failed. Any review draft was committed, but current-menu.json was not replaced."
+          exit 1

@@ -1,0 +1,40 @@
+{
+  "name": "mandarin-ordering",
+  "private": true,
+  "version": "1.0.0",
+  "type": "module",
+  "scripts": {
+    "dev": "vite",
+    "build": "npm run validate:menus && tsc -b && vite build",
+    "check": "npm run validate:cost && npm run lint && npm run test && npm run build",
+    "lint": "oxlint .",
+    "preview": "vite preview",
+    "test": "vitest run",
+    "test:watch": "vitest",
+    "validate:cost": "tsx scripts/check-zero-cost.ts",
+    "validate:menus": "tsx scripts/validate-menus.ts",
+    "import:facebook": "tsx scripts/import-menu.ts facebook",
+    "import:manual": "tsx scripts/import-menu.ts manual"
+  },
+  "dependencies": {
+    "react": "^19.2.8",
+    "react-dom": "^19.2.8",
+    "zod": "^4.3.6"
+  },
+  "devDependencies": {
+    "@testing-library/jest-dom": "^6.9.1",
+    "@testing-library/react": "^16.3.2",
+    "@testing-library/user-event": "^14.6.1",
+    "@types/node": "^24.13.3",
+    "@types/react": "^19.2.18",
+    "@types/react-dom": "^19.2.4",
+    "@vitejs/plugin-react": "^6.1.0",
+    "jsdom": "^28.1.0",
+    "oxlint": "^1.79.0",
+    "playwright": "^1.58.2",
+    "tsx": "^4.21.0",
+    "typescript": "~6.0.2",
+    "vite": "^8.2.2",
+    "vitest": "^4.1.1"
+  }
+}

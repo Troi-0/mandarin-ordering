@@ -1,0 +1,50 @@
+name: Import today's Facebook menu
+
+on:
+  schedule:
+    - cron: '0,30 8-11 * * *'
+      timezone: Europe/Sofia
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+concurrency:
+  group: menu-import
+  cancel-in-progress: false
+
+jobs:
+  import:
+    runs-on: ubuntu-latest
+    timeout-minutes: 12
+    steps:
+      - uses: actions/checkout@v6
+      - uses: actions/setup-node@v6
+        with:
+          node-version: 24
+          cache: npm
+      - run: npm ci
+      - run: npx playwright install --with-deps chromium
+      - name: Extract and verify public menu image
+        id: importer
+        continue-on-error: true
+        env:
+          GEMINI_API_KEY: ${{ secrets.GEMINI_API_KEY }}
+        run: npm run import:facebook
+      - name: Commit changed menu or review draft
+        if: always()
+        run: |
+          git config user.name "mandarin-menu-bot"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add data/current-menu.json data/menus data/review
+          if git diff --cached --quiet; then
+            echo "No menu-data change"
+          else
+            git commit -m "data: update Sofia menu $(date -u +%F)"
+            git push
+          fi
+      - name: Keep rejected extraction unpublished
+        if: steps.importer.outcome == 'failure'
+        run: |
+          echo "Import or verification failed. Any review draft was committed, but current-menu.json was not replaced."
+          exit 1

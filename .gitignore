@@ -1,0 +1,8 @@
+node_modules
+dist
+.DS_Store
+*.local
+playwright-report
+test-results
+manual-inbox/*
+!manual-inbox/README.md
