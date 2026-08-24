@@ -14,7 +14,7 @@ database, analytics, payment SDK, hosted font, or order-submission endpoint.
 3. Run **Deploy GitHub Pages** once from the Actions tab. After that, successful
    menu commits deploy automatically.
 
-The only allowed model is `gemini-3.6-flash`. The importer sends only the
+The only allowed model is `gemini-3.7-flash`. The importer sends only the
 already-public restaurant menu image to Gemini. It never receives visitor names,
 selections, or browser data.
 

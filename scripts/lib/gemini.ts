@@ -1,6 +1,6 @@
 import { z } from 'zod'
 
-export const FREE_GEMINI_MODEL = 'gemini-3.6-flash'
+export const FREE_GEMINI_MODEL = 'gemini-3.7-flash'
 const API_URL = `https://generativelanguage.googleapis.com/v1beta/models/${FREE_GEMINI_MODEL}:generateContent`
 
 export const extractedMenuSchema = z.object({
