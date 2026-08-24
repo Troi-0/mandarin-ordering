@@ -27,5 +27,8 @@ build validation.
   the free tier with billing disabled; there is no paid fallback.
 - Failed or uncertain extraction writes a draft under `data/review/` and never
   replaces the current menu.
+- A manually dispatched Facebook workflow defaults to **dry run**: it bypasses
+  the already-ready shortcut, exercises Facebook and both Gemini passes, uploads
+  a short-lived report artifact, and never commits or publishes menu data.
 
 See [docs/operations.md](docs/operations.md) for setup and recovery details.

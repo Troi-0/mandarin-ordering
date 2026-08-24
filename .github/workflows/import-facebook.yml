@@ -5,6 +5,12 @@ on:
     - cron: '0,30 8-11 * * *'
       timezone: Europe/Sofia
   workflow_dispatch:
+    inputs:
+      dry_run:
+        description: Run Facebook, Gemini, and validation without publishing anything
+        required: true
+        default: true
+        type: boolean
 
 permissions:
   contents: write
@@ -30,9 +36,19 @@ jobs:
         continue-on-error: true
         env:
           GEMINI_API_KEY: ${{ secrets.GEMINI_API_KEY }}
+          IMPORT_DRY_RUN: ${{ inputs.dry_run }}
+          IMPORT_REPORT_PATH: ${{ runner.temp }}/menu-import-report.json
         run: npm run import:facebook
+      - name: Upload dry-run report
+        if: ${{ always() && inputs.dry_run }}
+        uses: actions/upload-artifact@v4
+        with:
+          name: menu-import-dry-run-${{ github.run_id }}
+          path: ${{ runner.temp }}/menu-import-report.json
+          if-no-files-found: ignore
+          retention-days: 3
       - name: Commit changed menu or review draft
-        if: always()
+        if: ${{ always() && !inputs.dry_run }}
         run: |
           git config user.name "mandarin-menu-bot"
           git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
@@ -45,6 +61,12 @@ jobs:
           fi
       - name: Keep rejected extraction unpublished
         if: steps.importer.outcome == 'failure'
+        env:
+          DRY_RUN: ${{ inputs.dry_run }}
         run: |
-          echo "Import or verification failed. Any review draft was committed, but current-menu.json was not replaced."
+          if [ "$DRY_RUN" = "true" ]; then
+            echo "Dry run rejected. Check its report artifact; no repository data was changed."
+          else
+            echo "Import or verification failed. Any review draft was committed, but current-menu.json was not replaced."
+          fi
           exit 1

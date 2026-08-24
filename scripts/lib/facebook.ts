@@ -24,8 +24,9 @@ export function extractFacebookCandidatesFromHtml(html: string): FacebookStoryCa
     if (match.index === undefined) continue
     const before = html.slice(Math.max(0, match.index - 8_000), match.index)
     const after = html.slice(match.index, match.index + 180_000)
-    const authorMatches = [...before.matchAll(/"(?:actor_id|page_id)":"(\d+)"/g)]
-    const nearestAuthor = authorMatches.at(-1)?.[1]
+    const profileAuthors = [...before.matchAll(/"short_name":"(?:\\.|[^"\\])*","id":"(\d+)"/g)]
+    const legacyAuthors = [...before.matchAll(/"(?:actor_id|page_id)":"(\d+)"/g)]
+    const nearestAuthor = profileAuthors.at(-1)?.[1] ?? legacyAuthors.at(-1)?.[1]
     if (nearestAuthor !== PAGE_ID) continue
 
     const imageMatch = after.match(/"photo_image":\{"uri":"((?:\\.|[^"\\])+)"/)
@@ -61,10 +62,28 @@ export async function fetchLatestFacebookMenu(): Promise<{
     })
     const page = await context.newPage()
     await page.goto(FACEBOOK_PAGE_URL, { waitUntil: 'domcontentloaded', timeout: 45_000 })
-    await page.locator('article').first().waitFor({ state: 'attached', timeout: 25_000 })
+    await page.waitForFunction(
+      `document.documentElement.innerHTML.includes('"post_id"')`,
+      undefined,
+      { timeout: 15_000 },
+    ).catch(() => undefined)
     const html = await page.locator('html').evaluate((element) => element.innerHTML)
     const [candidate] = extractFacebookCandidatesFromHtml(html)
-    if (!candidate) throw new Error('No Page-authored image post was found in the public Facebook markup')
+    if (!candidate) {
+      const pageTitle = (await page.title()).slice(0, 120)
+      const diagnostics = {
+        postId: html.match(/post_id/g)?.length ?? 0,
+        adjacentTimestamp: html.match(/"post_id":"\d+","creation_time":\d+/g)?.length ?? 0,
+        creationTime: html.match(/creation_time/g)?.length ?? 0,
+        photoImage: html.match(/photo_image/g)?.length ?? 0,
+        pageId: html.match(new RegExp(PAGE_ID, 'g'))?.length ?? 0,
+        actorId: html.match(/actor_id/g)?.length ?? 0,
+        profileAuthor: html.match(/short_name/g)?.length ?? 0,
+      }
+      throw new Error(
+        `No Page-authored image post was found in Facebook markup (${html.length} bytes, title: ${pageTitle}, signals: ${JSON.stringify(diagnostics)})`,
+      )
+    }
 
     const response = await context.request.get(candidate.imageUrl, {
       headers: { referer: FACEBOOK_PAGE_URL },

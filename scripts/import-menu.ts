@@ -20,6 +20,13 @@ import {
 } from '../src/lib/menu-schema.ts'
 
 const root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..')
+const dryRun = process.env.IMPORT_DRY_RUN === 'true'
+
+function dryRunReportPath(): string {
+  const configuredPath = process.env.IMPORT_REPORT_PATH?.trim()
+  if (!configuredPath) throw new Error('IMPORT_REPORT_PATH is required when IMPORT_DRY_RUN=true')
+  return path.resolve(configuredPath)
+}
 
 function stableId(prefix: string, value: string): string {
   return `${prefix}-${createHash('sha256').update(value).digest('hex').slice(0, 12)}`
@@ -72,11 +79,26 @@ function menuFromExtraction(options: {
 }
 
 async function writeDraft(date: string, extracted: ExtractedMenu, verification: Verification): Promise<void> {
-  const reviewDir = path.join(root, 'data', 'review')
-  await mkdir(reviewDir, { recursive: true })
+  const outputPath = dryRun
+    ? dryRunReportPath()
+    : path.join(root, 'data', 'review', `${date}.json`)
+  await mkdir(path.dirname(outputPath), { recursive: true })
   await writeFile(
-    path.join(reviewDir, `${date}.json`),
-    `${JSON.stringify({ date, extracted, verification }, null, 2)}\n`,
+    outputPath,
+    `${JSON.stringify({ status: 'rejected', date, extracted, verification }, null, 2)}\n`,
+  )
+}
+
+async function writeApprovedDryRun(
+  menu: Menu,
+  extracted: ExtractedMenu,
+  verification: Verification,
+): Promise<void> {
+  const outputPath = dryRunReportPath()
+  await mkdir(path.dirname(outputPath), { recursive: true })
+  await writeFile(
+    outputPath,
+    `${JSON.stringify({ status: 'approved', menu, extracted, verification }, null, 2)}\n`,
   )
 }
 
@@ -132,9 +154,21 @@ async function processImage(options: {
   )
   if (extracted.uncertain || hasUncertainItems || !verification.approved || verification.uncertain || verification.issues.length > 0) {
     await writeDraft(options.date, extracted, verification)
-    throw new Error(`Menu requires manual review; draft saved for ${options.date}`)
+    throw new Error(
+      dryRun
+        ? `Dry run requires manual review; report saved for ${options.date}`
+        : `Menu requires manual review; draft saved for ${options.date}`,
+    )
   }
   const menu = menuFromExtraction({ ...options, extracted })
+  if (dryRun) {
+    await writeApprovedDryRun(menu, extracted, verification)
+    const itemCount = menu.categories.reduce((count, category) => count + category.items.length, 0)
+    process.stdout.write(
+      `Dry run approved ${menu.date}: ${menu.categories.length} categories, ${itemCount} items; nothing published\n`,
+    )
+    return
+  }
   const changed = await publishMenu(menu)
   process.stdout.write(changed ? `Published ${menu.date}\n` : `Menu ${menu.date} is unchanged\n`)
 }
@@ -144,7 +178,7 @@ async function runFacebook() {
     const current = JSON.parse(
       await readFile(path.join(root, 'data', 'current-menu.json'), 'utf8'),
     ) as { status?: string; menu?: { date?: string } }
-    if (current.status === 'ready' && current.menu?.date === sofiaDate()) {
+    if (!dryRun && current.status === 'ready' && current.menu?.date === sofiaDate()) {
       process.stdout.write(`Today's menu (${current.menu.date}) is already ready; skipping import\n`)
       return
     }

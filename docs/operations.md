@@ -30,6 +30,18 @@ calling Gemini. A changed, fully validated menu is committed to `data/menus/` an
 `data/current-menu.json`. A rejected result may create `data/review/YYYY-MM-DD.json`
 for a collaborator to inspect, but it cannot become the current menu.
 
+## Safe live test
+
+Run **Import today's Facebook menu** manually from the Actions tab and leave the
+**Run Facebook, Gemini, and validation without publishing anything** checkbox
+selected. This bypasses the already-ready shortcut and exercises the real public
+Facebook retrieval, both Gemini passes, schema checks, and deterministic menu
+invariants. It never commits or replaces menu data.
+
+The run uploads `menu-import-dry-run-<run id>` for three days. An approved report
+contains the candidate menu; a rejected report contains the extraction and exact
+verification issues. A rejected dry run intentionally finishes red.
+
 ## Manual fallback
 
 1. Download today's public Facebook menu image.

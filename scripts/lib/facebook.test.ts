@@ -5,7 +5,7 @@ import { extractFacebookCandidatesFromHtml } from './facebook.ts'
 function story(postId: string, creationTime: number, options?: { pageId?: string; image?: boolean }) {
   const pageId = options?.pageId ?? PAGE_ID
   const image = options?.image === false ? '' : '"photo_image":{"uri":"https:\\/\\/example.com\\/menu.jpg"}'
-  return `{"id":"${pageId}","actor_id":"${pageId}","post_id":"${postId}","creation_time":${creationTime},${image}}`
+  return `{"short_name":"Author","id":"${pageId}","post_id":"${postId}","creation_time":${creationTime},${image}}`
 }
 
 describe('Facebook embedded post parsing', () => {
