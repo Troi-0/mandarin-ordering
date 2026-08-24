@@ -28,7 +28,10 @@ build validation.
 - Failed or uncertain extraction writes a draft under `data/review/` and never
   replaces the current menu.
 - A manually dispatched Facebook workflow defaults to **dry run**: it bypasses
-  the already-ready shortcut, exercises Facebook and both Gemini passes, uploads
-  a short-lived report artifact, and never commits or publishes menu data.
+  the already-ready shortcut, exercises Facebook and two blind Gemini
+  transcriptions, compares them deterministically, uploads a short-lived report
+  artifact, and never commits or publishes menu data.
+- Its optional `data/menus/2026-08-24.json` benchmark replays the historical
+  Facebook post and compares all 43 items with the human-verified reference.
 
 See [docs/operations.md](docs/operations.md) for setup and recovery details.

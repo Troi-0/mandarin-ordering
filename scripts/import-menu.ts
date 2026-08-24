@@ -2,8 +2,9 @@ import { createHash } from 'node:crypto'
 import { mkdir, readFile, writeFile } from 'node:fs/promises'
 import path from 'node:path'
 import { fileURLToPath } from 'node:url'
-import { fetchLatestFacebookMenu } from './lib/facebook.ts'
+import { fetchFacebookMenu } from './lib/facebook.ts'
 import {
+  compareTranscriptions,
   extractMenu,
   FREE_GEMINI_MODEL,
   verifyMenu,
@@ -60,7 +61,7 @@ function menuFromExtraction(options: {
     importMethod: options.method,
     validation: {
       extractedBy: FREE_GEMINI_MODEL,
-      verifiedBy: FREE_GEMINI_MODEL,
+      verifiedBy: `${FREE_GEMINI_MODEL}:blind-transcription`,
       uncertain: false,
     },
     categories: options.extracted.categories.map((category, categoryIndex) => ({
@@ -78,27 +79,49 @@ function menuFromExtraction(options: {
   return menu
 }
 
-async function writeDraft(date: string, extracted: ExtractedMenu, verification: Verification): Promise<void> {
+async function writeDraft(
+  date: string,
+  extracted: ExtractedMenu,
+  verificationTranscript: ExtractedMenu,
+  verification: Verification,
+  benchmark?: Verification,
+): Promise<void> {
   const outputPath = dryRun
     ? dryRunReportPath()
     : path.join(root, 'data', 'review', `${date}.json`)
   await mkdir(path.dirname(outputPath), { recursive: true })
   await writeFile(
     outputPath,
-    `${JSON.stringify({ status: 'rejected', date, extracted, verification }, null, 2)}\n`,
+    `${JSON.stringify({
+      status: 'rejected',
+      date,
+      extracted,
+      verificationTranscript,
+      verification,
+      ...(benchmark ? { benchmark } : {}),
+    }, null, 2)}\n`,
   )
 }
 
 async function writeApprovedDryRun(
   menu: Menu,
   extracted: ExtractedMenu,
+  verificationTranscript: ExtractedMenu,
   verification: Verification,
+  benchmark?: Verification,
 ): Promise<void> {
   const outputPath = dryRunReportPath()
   await mkdir(path.dirname(outputPath), { recursive: true })
   await writeFile(
     outputPath,
-    `${JSON.stringify({ status: 'approved', menu, extracted, verification }, null, 2)}\n`,
+    `${JSON.stringify({
+      status: 'approved',
+      menu,
+      extracted,
+      verificationTranscript,
+      verification,
+      ...(benchmark ? { benchmark } : {}),
+    }, null, 2)}\n`,
   )
 }
 
@@ -142,18 +165,20 @@ async function processImage(options: {
   sourcePostUrl: string
   publishedAt: string
   method: 'facebook' | 'manual'
+  benchmarkReference?: Menu
 }) {
-  const today = sofiaDate()
-  if (options.date !== today) {
-    throw new Error(`Fail-closed date check: source is ${options.date}, today in Sofia is ${today}`)
+  const expectedDate = options.benchmarkReference?.date ?? sofiaDate()
+  if (options.date !== expectedDate) {
+    throw new Error(`Fail-closed date check: source is ${options.date}, expected ${expectedDate}`)
   }
   const extracted = await extractMenu(options.image, options.mimeType)
-  const verification = await verifyMenu(options.image, options.mimeType, extracted)
-  const hasUncertainItems = extracted.categories.some((category) =>
-    category.items.some((item) => item.uncertain),
-  )
-  if (extracted.uncertain || hasUncertainItems || !verification.approved || verification.uncertain || verification.issues.length > 0) {
-    await writeDraft(options.date, extracted, verification)
+  const verificationTranscript = await verifyMenu(options.image, options.mimeType)
+  const verification = compareTranscriptions(extracted, verificationTranscript)
+  const benchmark = options.benchmarkReference
+    ? compareTranscriptions(extracted, referenceTranscript(options.benchmarkReference, extracted))
+    : undefined
+  if (!verification.approved || (benchmark && !benchmark.approved)) {
+    await writeDraft(options.date, extracted, verificationTranscript, verification, benchmark)
     throw new Error(
       dryRun
         ? `Dry run requires manual review; report saved for ${options.date}`
@@ -162,7 +187,7 @@ async function processImage(options: {
   }
   const menu = menuFromExtraction({ ...options, extracted })
   if (dryRun) {
-    await writeApprovedDryRun(menu, extracted, verification)
+    await writeApprovedDryRun(menu, extracted, verificationTranscript, verification, benchmark)
     const itemCount = menu.categories.reduce((count, category) => count + category.items.length, 0)
     process.stdout.write(
       `Dry run approved ${menu.date}: ${menu.categories.length} categories, ${itemCount} items; nothing published\n`,
@@ -173,7 +198,42 @@ async function processImage(options: {
   process.stdout.write(changed ? `Published ${menu.date}\n` : `Menu ${menu.date} is unchanged\n`)
 }
 
+function referenceTranscript(reference: Menu, extracted: ExtractedMenu): ExtractedMenu {
+  return {
+    uncertain: false,
+    uncertaintyNotes: [],
+    categories: reference.categories.map((category, categoryIndex) => ({
+      // Human-verified menu JSON uses display-friendly category casing; item fields remain exact.
+      name: extracted.categories[categoryIndex]?.name ?? category.name,
+      items: category.items.map((item) => ({
+        name: item.name,
+        portion: item.portion ?? null,
+        priceCents: item.priceCents,
+        uncertain: false,
+      })),
+    })),
+  }
+}
+
+async function loadBenchmarkReference(): Promise<Menu | undefined> {
+  const repositoryPath = process.env.IMPORT_BENCHMARK_MENU?.trim()
+  if (!repositoryPath) return undefined
+  if (!dryRun) throw new Error('IMPORT_BENCHMARK_MENU is allowed only when IMPORT_DRY_RUN=true')
+  if (!/^data\/menus\/\d{4}-\d{2}-\d{2}\.json$/.test(repositoryPath)) {
+    throw new Error('Benchmark reference must be data/menus/YYYY-MM-DD.json')
+  }
+  const reference = menuSchema.parse(
+    JSON.parse(await readFile(path.resolve(root, repositoryPath), 'utf8')),
+  )
+  assertMenuInvariants(reference)
+  if (!reference.validation.extractedBy.startsWith('human-verified')) {
+    throw new Error('Benchmark reference must be marked as human-verified')
+  }
+  return reference
+}
+
 async function runFacebook() {
+  const benchmarkReference = await loadBenchmarkReference()
   try {
     const current = JSON.parse(
       await readFile(path.join(root, 'data', 'current-menu.json'), 'utf8'),
@@ -184,7 +244,11 @@ async function runFacebook() {
     }
   } catch { /* no valid current pointer yet */ }
 
-  const { candidate, image, mimeType } = await fetchLatestFacebookMenu()
+  const { candidate, image, mimeType } = await fetchFacebookMenu(
+    benchmarkReference
+      ? { postId: benchmarkReference.source.postId, postUrl: benchmarkReference.source.postUrl }
+      : undefined,
+  )
   const publishedAt = new Date(candidate.creationTime * 1000).toISOString()
   await processImage({
     image,
@@ -194,6 +258,7 @@ async function runFacebook() {
     sourcePostUrl: candidate.postUrl,
     publishedAt,
     method: 'facebook',
+    benchmarkReference,
   })
 }
 

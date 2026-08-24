@@ -14,7 +14,7 @@ database, analytics, payment SDK, hosted font, or order-submission endpoint.
 3. Run **Deploy GitHub Pages** once from the Actions tab. After that, successful
    menu commits deploy automatically.
 
-The only allowed model is `gemini-3.1-flash-lite`. The importer sends only the
+The only allowed model is `gemini-3.6-flash`. The importer sends only the
 already-public restaurant menu image to Gemini. It never receives visitor names,
 selections, or browser data.
 
@@ -23,7 +23,9 @@ selections, or browser data.
 The scheduled workflow checks from 08:00 through 11:30 every 30 minutes in the
 `Europe/Sofia` timezone. It reads the newest Page-authored Facebook image post by
 its embedded creation timestamp, rejects anything not dated today in Sofia, then
-runs separate extraction and verification requests.
+runs two independent image transcriptions. The second pass is blind: it never
+receives the first pass. Code compares category order, item order, exact names,
+portions, and integer-cent prices and rejects every disagreement.
 
 Once today's menu is ready, later scheduled runs exit before opening Facebook or
 calling Gemini. A changed, fully validated menu is committed to `data/menus/` and
@@ -39,8 +41,15 @@ Facebook retrieval, both Gemini passes, schema checks, and deterministic menu
 invariants. It never commits or replaces menu data.
 
 The run uploads `menu-import-dry-run-<run id>` for three days. An approved report
-contains the candidate menu; a rejected report contains the extraction and exact
-verification issues. A rejected dry run intentionally finishes red.
+contains the candidate menu, both blind transcripts, and their deterministic
+comparison. A rejected report contains both transcripts and the exact disagreement
+list. A rejected dry run intentionally finishes red.
+
+To regression-test the model against the original human-verified 43-item menu,
+set **Optional human-verified reference** to `data/menus/2026-08-24.json`. This
+loads that reference's historical Facebook post, runs both live Gemini passes,
+and also compares every item name, portion, and price with the human reference.
+Benchmark mode is accepted only during a dry run and can never publish data.
 
 ## Manual fallback
 

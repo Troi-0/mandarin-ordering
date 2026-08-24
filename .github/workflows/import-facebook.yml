@@ -11,6 +11,11 @@ on:
         required: true
         default: true
         type: boolean
+      benchmark_reference:
+        description: Optional human-verified reference such as data/menus/2026-08-24.json (dry run only)
+        required: false
+        default: ''
+        type: string
 
 permissions:
   contents: write
@@ -38,6 +43,7 @@ jobs:
           GEMINI_API_KEY: ${{ secrets.GEMINI_API_KEY }}
           IMPORT_DRY_RUN: ${{ inputs.dry_run }}
           IMPORT_REPORT_PATH: ${{ runner.temp }}/menu-import-report.json
+          IMPORT_BENCHMARK_MENU: ${{ inputs.benchmark_reference }}
         run: npm run import:facebook
       - name: Upload dry-run report
         if: ${{ always() && inputs.dry_run }}

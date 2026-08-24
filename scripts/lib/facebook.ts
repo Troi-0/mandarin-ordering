@@ -8,6 +8,11 @@ export interface FacebookStoryCandidate {
   postUrl: string
 }
 
+export interface FacebookPostTarget {
+  postId: string
+  postUrl: string
+}
+
 function decodeJsonString(value: string): string {
   try {
     return JSON.parse(`"${value}"`) as string
@@ -48,7 +53,15 @@ export function extractFacebookCandidatesFromHtml(html: string): FacebookStoryCa
   return [...candidates.values()].sort((a, b) => b.creationTime - a.creationTime)
 }
 
-export async function fetchLatestFacebookMenu(): Promise<{
+export function selectFacebookCandidate(
+  candidates: FacebookStoryCandidate[],
+  target?: FacebookPostTarget,
+): FacebookStoryCandidate | undefined {
+  if (!target) return candidates[0]
+  return candidates.find((candidate) => candidate.postId === target.postId)
+}
+
+export async function fetchFacebookMenu(target?: FacebookPostTarget): Promise<{
   candidate: FacebookStoryCandidate
   image: Uint8Array
   mimeType: string
@@ -61,14 +74,15 @@ export async function fetchLatestFacebookMenu(): Promise<{
       viewport: { width: 1365, height: 1600 },
     })
     const page = await context.newPage()
-    await page.goto(FACEBOOK_PAGE_URL, { waitUntil: 'domcontentloaded', timeout: 45_000 })
+    const pageUrl = target?.postUrl ?? FACEBOOK_PAGE_URL
+    await page.goto(pageUrl, { waitUntil: 'domcontentloaded', timeout: 45_000 })
     await page.waitForFunction(
       `document.documentElement.innerHTML.includes('"post_id"')`,
       undefined,
       { timeout: 15_000 },
     ).catch(() => undefined)
     const html = await page.locator('html').evaluate((element) => element.innerHTML)
-    const [candidate] = extractFacebookCandidatesFromHtml(html)
+    const candidate = selectFacebookCandidate(extractFacebookCandidatesFromHtml(html), target)
     if (!candidate) {
       const pageTitle = (await page.title()).slice(0, 120)
       const diagnostics = {
@@ -81,12 +95,12 @@ export async function fetchLatestFacebookMenu(): Promise<{
         profileAuthor: html.match(/short_name/g)?.length ?? 0,
       }
       throw new Error(
-        `No Page-authored image post was found in Facebook markup (${html.length} bytes, title: ${pageTitle}, signals: ${JSON.stringify(diagnostics)})`,
+        `No matching Page-authored image post was found in Facebook markup (${html.length} bytes, title: ${pageTitle}, target: ${target?.postId ?? 'latest'}, signals: ${JSON.stringify(diagnostics)})`,
       )
     }
 
     const response = await context.request.get(candidate.imageUrl, {
-      headers: { referer: FACEBOOK_PAGE_URL },
+      headers: { referer: pageUrl },
       timeout: 30_000,
     })
     if (!response.ok()) throw new Error(`Facebook image download failed with ${response.status()}`)

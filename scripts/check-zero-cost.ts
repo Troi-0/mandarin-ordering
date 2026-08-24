@@ -12,8 +12,8 @@ const packages = Object.keys({ ...packageJson.dependencies, ...packageJson.devDe
 const forbiddenPackages = /stripe|openai|firebase|supabase|segment|mixpanel|amplitude|sentry|posthog/i
 const forbidden = packages.filter((name) => forbiddenPackages.test(name))
 if (forbidden.length) throw new Error(`Cost boundary: forbidden packages found: ${forbidden.join(', ')}`)
-if (FREE_GEMINI_MODEL !== 'gemini-3.1-flash-lite') {
-  throw new Error(`Cost boundary: only gemini-3.1-flash-lite is permitted, received ${FREE_GEMINI_MODEL}`)
+if (FREE_GEMINI_MODEL !== 'gemini-3.6-flash') {
+  throw new Error(`Cost boundary: only gemini-3.6-flash is permitted, received ${FREE_GEMINI_MODEL}`)
 }
 
 const sourceFiles = ['index.html', 'src/App.tsx', 'src/styles.css', 'src/lib/menu-schema.ts']
