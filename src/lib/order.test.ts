@@ -11,7 +11,7 @@ describe('order calculations', () => {
     expect(formatEuro(summary.totalCents)).toMatch(/10,50\s*€/)
   })
 
-  it('creates a named, complete share summary', () => {
+  it('creates a named copy summary without a source URL', () => {
     const text = summaryToText(
       createOrderSummary(menuFixture, { soup: 1 }, '  Мария  ', '  без хляб  '),
     )
@@ -19,6 +19,7 @@ describe('order calculations', () => {
     expect(text).toContain('Обяд за 2026-08-24 — Мария')
     expect(text).toContain('1 × Пилешка супа (350 мл)')
     expect(text).toContain('Бележка: без хляб')
-    expect(text).toContain(menuFixture.source.postUrl)
+    expect(text).not.toContain('Източник:')
+    expect(text).not.toContain(menuFixture.source.postUrl)
   })
 })

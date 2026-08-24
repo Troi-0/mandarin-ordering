@@ -128,7 +128,7 @@ export function MenuApp({ menu }: { menu: Menu }) {
     textarea.remove()
   }
 
-  async function shareOrder() {
+  async function copyOrder() {
     const cleanName = participantName.trim()
     if (!cleanName) {
       setNameError(true)
@@ -145,21 +145,10 @@ export function MenuApp({ menu }: { menu: Menu }) {
     const summary = createOrderSummary(menu, quantities, cleanName, note)
     const text = summaryToText(summary)
     try {
-      if (navigator.share) {
-        await navigator.share({ title: `Обяд — ${cleanName}`, text })
-        setNotice({ kind: 'success', text: 'Обобщението е готово за споделяне.' })
-      } else {
-        await copyText(text)
-        setNotice({ kind: 'success', text: 'Обобщението е копирано.' })
-      }
-    } catch (error) {
-      if (error instanceof DOMException && error.name === 'AbortError') return
-      try {
-        await copyText(text)
-        setNotice({ kind: 'success', text: 'Обобщението е копирано.' })
-      } catch {
-        setNotice({ kind: 'error', text: 'Не успяхме да копираме. Опитай отново.' })
-      }
+      await copyText(text)
+      setNotice({ kind: 'success', text: 'Обобщението е копирано.' })
+    } catch {
+      setNotice({ kind: 'error', text: 'Не успяхме да копираме. Опитай отново.' })
     }
   }
 
@@ -227,8 +216,8 @@ export function MenuApp({ menu }: { menu: Menu }) {
       </div>
 
       {notice && <p className={`notice notice--${notice.kind}`} role="status">{notice.text}</p>}
-      <button className="share-button" type="button" onClick={shareOrder}>
-        <span>Сподели избора</span><span aria-hidden="true">↗</span>
+      <button className="share-button" type="button" onClick={copyOrder}>
+        <span>Копирай избора</span><span aria-hidden="true">⧉</span>
       </button>
       <p className="privacy-note">Нищо не се изпраща автоматично и не се съхранява онлайн.</p>
     </div>
@@ -256,7 +245,7 @@ export function MenuApp({ menu }: { menu: Menu }) {
           <div className="hero-copy">
             <span className="eyebrow eyebrow--light">Обедно меню · {formatBulgarianDate(menu.date)}</span>
             <h1>Какво ще<br />хапваш <em>днес?</em></h1>
-            <p>Избери ястията си, виж точната сума и изпрати готовото обобщение.</p>
+            <p>Избери ястията си, виж точната сума и копирай готовото обобщение.</p>
           </div>
           <div className="hero-plate" aria-hidden="true">
             <span className="plate-leaf plate-leaf--one" />

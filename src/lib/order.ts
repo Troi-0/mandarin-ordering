@@ -84,6 +84,5 @@ export function summaryToText(summary: OrderSummary): string {
     `Общо: ${formatEuro(summary.totalCents)}`,
   ]
   if (summary.note) lines.push(`Бележка: ${summary.note}`)
-  lines.push('', `Източник: ${summary.sourceUrl}`)
   return lines.join('\n')
 }
