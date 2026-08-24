@@ -4,6 +4,7 @@ import { menuSchema } from '../../src/lib/menu-schema.ts'
 import {
   compareTranscriptions,
   extractedMenuSchema,
+  normalizeTranscription,
   type ExtractedMenu,
 } from './gemini.ts'
 
@@ -27,6 +28,13 @@ async function humanVerifiedTranscript(): Promise<ExtractedMenu> {
 }
 
 describe('blind Gemini transcription comparison', () => {
+  it('normalizes printed gram abbreviations before comparison and publication', async () => {
+    const transcript = await humanVerifiedTranscript()
+    transcript.categories[1].items[0].portion = '350гр.'
+
+    expect(normalizeTranscription(transcript).categories[1].items[0].portion).toBe('350 г')
+  })
+
   it('approves exact independent agreement across the human-verified 43-item menu', async () => {
     const extracted = await humanVerifiedTranscript()
     const verificationTranscript = structuredClone(extracted)
@@ -39,13 +47,13 @@ describe('blind Gemini transcription comparison', () => {
     })
   })
 
-  it('rejects the known 3.1-style name, portion, and price disagreements', async () => {
+  it('rejects name, portion, and price disagreements', async () => {
     const extracted = await humanVerifiedTranscript()
     const verificationTranscript = structuredClone(extracted)
     verificationTranscript.categories[1].items[1].name =
-      'Късчета от пилешко фие с териаки сос , с гарнитура ориз'
+      'Късчета от пилешко филе с териаки сос, с гарнитура ориз'
     verificationTranscript.categories[1].items[4].name =
-      'Телешки кюфтета не скара /2бр/, с ½ пърленка, тирокафтери и гарнитура'
+      'Телешки кюфтета на скара /2 бр./, с ½ пърленка, тирокафтери и гарнитура'
     verificationTranscript.categories[4].items[0].priceCents = 130
     verificationTranscript.categories[5].items[1].name =
       'Сала Капрезе с моцарела и песто 300гр/единично опакована/'

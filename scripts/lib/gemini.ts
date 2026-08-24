@@ -71,7 +71,7 @@ const extractionPrompt = [
   'Preserve the Bulgarian spelling exactly as printed. Keep descriptive text in the item name.',
   'Do not include printed list numbers such as 1. or 10. in category or item names.',
   'The source may contain spelling mistakes. Preserve them exactly; never silently correct them.',
-  'Normalize portions only by inserting a space before мл, г, or бр.; do not invent a portion.',
+  'Normalize portions as 350 мл, 350 г, or 2 бр.; convert printed гр to г and do not invent a portion.',
   'Convert euro prices to integer cents. A printed 2.70€ is 270.',
   'Never infer hidden, cropped, overlapped, or illegible text. Mark the item and whole result uncertain instead.',
   'Do not include the restaurant name, date heading, phone number, or ordering caption as items.',
@@ -84,7 +84,7 @@ const blindVerificationPrompt = [
   'Preserve each printed Bulgarian glyph exactly, including apparent spelling mistakes.',
   'Check every decimal price digit carefully, especially visually similar digits such as 3 and 8.',
   'Do not include printed list numbers such as 1. or 10. in category or item names.',
-  'Normalize portions only by inserting a space before мл, г, or бр.; do not invent a portion.',
+  'Normalize portions as 350 мл, 350 г, or 2 бр.; convert printed гр to г and do not invent a portion.',
   'Convert euro prices to integer cents. A printed 2.70€ is 270.',
   'If any text or digit is not clearly legible, mark the item and whole result uncertain instead of guessing.',
   'Do not include the restaurant name, date heading, phone number, or ordering caption as items.',
@@ -142,7 +142,7 @@ export async function extractMenu(image: Uint8Array, mimeType: string): Promise<
     mimeType,
     extractionJsonSchema,
   )
-  return extractedMenuSchema.parse(result)
+  return normalizeTranscription(extractedMenuSchema.parse(result))
 }
 
 export async function verifyMenu(
@@ -155,7 +155,32 @@ export async function verifyMenu(
     mimeType,
     extractionJsonSchema,
   )
-  return extractedMenuSchema.parse(result)
+  return normalizeTranscription(extractedMenuSchema.parse(result))
+}
+
+export function normalizeTranscription(transcript: ExtractedMenu): ExtractedMenu {
+  return {
+    ...transcript,
+    categories: transcript.categories.map((category) => ({
+      ...category,
+      items: category.items.map((item) => ({
+        ...item,
+        portion: normalizePortion(item.portion),
+      })),
+    })),
+  }
+}
+
+function normalizePortion(portion: string | null): string | null {
+  if (portion === null) return null
+  const compact = portion.trim().replace(/\s+/g, ' ')
+  const match = compact.match(/^(\d+(?:[.,]\d+)?)\s*(мл|гр|г|бр)\.?$/iu)
+  if (!match) return compact
+  const [, amount, printedUnit] = match
+  const unit = printedUnit.toLocaleLowerCase('bg-BG')
+  if (unit === 'гр' || unit === 'г') return `${amount} г`
+  if (unit === 'бр') return `${amount} бр.`
+  return `${amount} мл`
 }
 
 export function compareTranscriptions(
