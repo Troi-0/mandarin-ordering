@@ -24,8 +24,9 @@ The scheduled workflow checks from 08:00 through 11:30 every 30 minutes in the
 `Europe/Sofia` timezone. It reads the newest Page-authored Facebook image post by
 its embedded creation timestamp, rejects anything not dated today in Sofia, then
 runs two independent image transcriptions. The second pass is blind: it never
-receives the first pass. Code compares category order, item order, exact names,
-portions, and integer-cent prices and rejects every disagreement.
+receives the first pass. Code matches categories by normalized Bulgarian name
+regardless of returned category order, then compares item order, exact names,
+portions, and integer-cent prices and rejects every real disagreement.
 
 Once today's menu is ready, later scheduled runs exit before opening Facebook or
 calling Gemini. A changed, fully validated menu is committed to `data/menus/` and
