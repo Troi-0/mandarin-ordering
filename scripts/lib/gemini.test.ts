@@ -47,6 +47,38 @@ describe('blind Gemini transcription comparison', () => {
     })
   })
 
+  it('approves identical categories returned in a different order', async () => {
+    const extracted = await humanVerifiedTranscript()
+    const verificationTranscript = structuredClone(extracted)
+    verificationTranscript.categories.reverse()
+    verificationTranscript.categories[0].name = verificationTranscript.categories[0].name
+      .toLocaleUpperCase('bg-BG')
+
+    expect(compareTranscriptions(extracted, verificationTranscript)).toEqual({
+      approved: true,
+      uncertain: false,
+      issues: [],
+    })
+  })
+
+  it('still rejects item disagreements after categories are reordered', async () => {
+    const extracted = await humanVerifiedTranscript()
+    const verificationTranscript = structuredClone(extracted)
+    verificationTranscript.categories.reverse()
+    const grill = verificationTranscript.categories.find((category) => category.name === 'Скара')
+    if (!grill) throw new Error('Expected the human-verified fixture to contain Скара')
+    grill.items[0].priceCents += 1
+
+    expect(compareTranscriptions(extracted, verificationTranscript)).toMatchObject({
+      approved: false,
+      uncertain: false,
+      issues: [{
+        category: 'Скара',
+        field: 'price',
+      }],
+    })
+  })
+
   it('rejects name, portion, and price disagreements', async () => {
     const extracted = await humanVerifiedTranscript()
     const verificationTranscript = structuredClone(extracted)

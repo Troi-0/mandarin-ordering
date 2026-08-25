@@ -183,6 +183,25 @@ function normalizePortion(portion: string | null): string | null {
   return `${amount} мл`
 }
 
+function normalizedCategoryKey(name: string): string {
+  return name
+    .normalize('NFC')
+    .trim()
+    .replace(/\s+/gu, ' ')
+    .toLocaleUpperCase('bg-BG')
+}
+
+function categoriesByNormalizedName(categories: ExtractedMenu['categories']) {
+  const indexed = new Map<string, ExtractedMenu['categories']>()
+  for (const category of categories) {
+    const key = normalizedCategoryKey(category.name)
+    const matches = indexed.get(key) ?? []
+    matches.push(category)
+    indexed.set(key, matches)
+  }
+  return indexed
+}
+
 export function compareTranscriptions(
   extracted: ExtractedMenu,
   verificationTranscript: ExtractedMenu,
@@ -205,26 +224,56 @@ export function compareTranscriptions(
     })
   }
 
-  const categoryCount = Math.max(extracted.categories.length, verificationTranscript.categories.length)
-  for (let categoryIndex = 0; categoryIndex < categoryCount; categoryIndex += 1) {
-    const extractedCategory = extracted.categories[categoryIndex]
-    const verifiedCategory = verificationTranscript.categories[categoryIndex]
-    if (!extractedCategory || !verifiedCategory) {
-      addIssue({
-        category: extractedCategory?.name ?? verifiedCategory?.name ?? '',
-        item: '',
-        field: 'category',
-        explanation: `Category ${categoryIndex + 1} exists in only one transcription`,
-      })
+  const extractedCategories = categoriesByNormalizedName(extracted.categories)
+  const verifiedCategories = categoriesByNormalizedName(verificationTranscript.categories)
+  const categoryKeys = new Set([
+    ...extractedCategories.keys(),
+    ...verifiedCategories.keys(),
+  ])
+
+  for (const categoryKey of categoryKeys) {
+    const extractedMatches = extractedCategories.get(categoryKey) ?? []
+    const verifiedMatches = verifiedCategories.get(categoryKey) ?? []
+    const categoryName = extractedMatches[0]?.name ?? verifiedMatches[0]?.name ?? categoryKey
+
+    if (extractedMatches.length !== 1 || verifiedMatches.length !== 1) {
+      if (extractedMatches.length === 0 || verifiedMatches.length === 0) {
+        addIssue({
+          category: categoryName,
+          item: '',
+          field: 'category',
+          explanation: `Category "${categoryName}" exists only in ${extractedMatches.length === 0 ? 'blind verification' : 'extraction'}`,
+        })
+      }
+      if (extractedMatches.length > 1) {
+        addIssue({
+          category: categoryName,
+          item: '',
+          field: 'category',
+          explanation: `Category "${categoryName}" appears ${extractedMatches.length} times in extraction`,
+        })
+      }
+      if (verifiedMatches.length > 1) {
+        addIssue({
+          category: categoryName,
+          item: '',
+          field: 'category',
+          explanation: `Category "${categoryName}" appears ${verifiedMatches.length} times in blind verification`,
+        })
+      }
       continue
     }
-    if (extractedCategory.name !== verifiedCategory.name) {
+
+    const [extractedCategory] = extractedMatches
+    const [verifiedCategory] = verifiedMatches
+    if (!extractedCategory || !verifiedCategory) {
       addIssue({
-        category: extractedCategory.name,
+        category: categoryName,
         item: '',
         field: 'category',
-        explanation: `Category name disagrees: extraction "${extractedCategory.name}", blind verification "${verifiedCategory.name}"`,
+        explanation: `Category "${categoryName}" could not be matched safely`,
       })
+      continue
     }
     if (extractedCategory.items.length !== verifiedCategory.items.length) {
       addIssue({
