@@ -226,7 +226,7 @@
             "uncertain": false
           },
           {
-            "name": "Сала Капрезе с моцарела и песто /единично опакована/",
+            "name": "Сала Капрезе с моцарела и песто/единично опакована/",
             "portion": "300 г",
             "priceCents": 450,
             "uncertain": false
@@ -526,7 +526,7 @@
             "uncertain": false
           },
           {
-            "name": "Салата Капрезе с моцарела и песто /единично опакована/",
+            "name": "Сала Капрезе с моцарела и песто/единично опакована/",
             "portion": "300 г",
             "priceCents": 450,
             "uncertain": false
@@ -544,7 +544,7 @@
             "uncertain": false
           },
           {
-            "name": "Салата табуле/",
+            "name": "Салата табуле",
             "portion": "100 г",
             "priceCents": 92,
             "uncertain": false
@@ -568,7 +568,7 @@
             "uncertain": false
           },
           {
-            "name": "Салата зеле и моркови",
+            "name": "Салата яйце и моркови",
             "portion": "100 г",
             "priceCents": 92,
             "uncertain": false
@@ -592,7 +592,7 @@
             "uncertain": false
           },
           {
-            "name": "Домашна лютеница",
+            "name": "Домашна лютеничка",
             "portion": "50 г",
             "priceCents": 51,
             "uncertain": false
@@ -607,15 +607,15 @@
     "issues": [
       {
         "category": "САЛАТИ",
-        "item": "Сала Капрезе с моцарела и песто /единично опакована/",
+        "item": "Салата табуле/",
         "field": "name",
-        "explanation": "Name disagrees: extraction \"Сала Капрезе с моцарела и песто /единично опакована/\", blind verification \"Салата Капрезе с моцарела и песто /единично опакована/\""
+        "explanation": "Name disagrees: extraction \"Салата табуле/\", blind verification \"Салата табуле\""
       },
       {
         "category": "САЛАТИ",
-        "item": "Домашна лютеничка",
+        "item": "Салата зеле и моркови",
         "field": "name",
-        "explanation": "Name disagrees: extraction \"Домашна лютеничка\", blind verification \"Домашна лютеница\""
+        "explanation": "Name disagrees: extraction \"Салата зеле и моркови\", blind verification \"Салата яйце и моркови\""
       }
     ]
   }
