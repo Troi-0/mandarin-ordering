@@ -1,0 +1,838 @@
+{
+  "status": "rejected",
+  "date": "2026-08-25",
+  "extracted": {
+    "uncertain": false,
+    "uncertaintyNotes": [],
+    "categories": [
+      {
+        "name": "СУПИ",
+        "items": [
+          {
+            "name": "Супа топчета",
+            "portion": "350 мл",
+            "priceCents": 270,
+            "uncertain": false
+          },
+          {
+            "name": "Крем супа от червена леща",
+            "portion": "350 мл",
+            "priceCents": 250,
+            "uncertain": false
+          },
+          {
+            "name": "Таратор",
+            "portion": "350 мл",
+            "priceCents": 180,
+            "uncertain": false
+          }
+        ]
+      },
+      {
+        "name": "ОСНОВНИ",
+        "items": [
+          {
+            "name": "Панирано пилешко филе със сусам, с гарнитура",
+            "portion": "350 г",
+            "priceCents": 510,
+            "uncertain": false
+          },
+          {
+            "name": "Пилешко филе със зеленчуци и нудли, по азиатски",
+            "portion": "350 г",
+            "priceCents": 510,
+            "uncertain": false
+          },
+          {
+            "name": "Мариновани карета от свинско контра филе на плоча, с гарнитура",
+            "portion": "350 г",
+            "priceCents": 510,
+            "uncertain": false
+          },
+          {
+            "name": "Запечено свинско джоланче с ориз на фурна",
+            "portion": "350 г",
+            "priceCents": 480,
+            "uncertain": false
+          },
+          {
+            "name": "Папуцаки , с гарнитура /пълнен патладжан с мляно месо и моцарела/",
+            "portion": "350 г",
+            "priceCents": 490,
+            "uncertain": false
+          },
+          {
+            "name": "Класическа Мусака",
+            "portion": "350 г",
+            "priceCents": 450,
+            "uncertain": false
+          },
+          {
+            "name": "Картофени кюфтета, с млечен сос и гарнитура",
+            "portion": "350 г",
+            "priceCents": 430,
+            "uncertain": false
+          },
+          {
+            "name": "Пържени чушки с яйца и сирене",
+            "portion": "350 г",
+            "priceCents": 410,
+            "uncertain": false
+          },
+          {
+            "name": "Булгур със спанак и манатарки",
+            "portion": "350 г",
+            "priceCents": 410,
+            "uncertain": false
+          },
+          {
+            "name": "Филе от лаврак на плоча, с гарнитура",
+            "portion": "350 г",
+            "priceCents": 880,
+            "uncertain": false
+          }
+        ]
+      },
+      {
+        "name": "ГАРНИТУРИ",
+        "items": [
+          {
+            "name": "Пържени уеджис картофки",
+            "portion": "100 г",
+            "priceCents": 92,
+            "uncertain": false
+          },
+          {
+            "name": "Печени картофки на фурна",
+            "portion": "100 г",
+            "priceCents": 92,
+            "uncertain": false
+          },
+          {
+            "name": "Задушени зеленчуци",
+            "portion": "100 г",
+            "priceCents": 92,
+            "uncertain": false
+          },
+          {
+            "name": "Задушен ориз",
+            "portion": "100 г",
+            "priceCents": 92,
+            "uncertain": false
+          },
+          {
+            "name": "Картофено пюре",
+            "portion": "100 г",
+            "priceCents": 92,
+            "uncertain": false
+          }
+        ]
+      },
+      {
+        "name": "СКАРА",
+        "items": [
+          {
+            "name": "Мариновани свински ребърца на скара",
+            "portion": "200 г",
+            "priceCents": 348,
+            "uncertain": false
+          },
+          {
+            "name": "Кралски котлет с цяло ребро на скара",
+            "portion": "300 г",
+            "priceCents": 660,
+            "uncertain": false
+          },
+          {
+            "name": "Пилешко филе на скара",
+            "portion": "130 г",
+            "priceCents": 302,
+            "uncertain": false
+          },
+          {
+            "name": "Пържола от пилешко бутче на скара",
+            "portion": "150 г",
+            "priceCents": 307,
+            "uncertain": false
+          },
+          {
+            "name": "Шишче от пилешко филе със зеленчуци",
+            "portion": "100 г",
+            "priceCents": 179,
+            "uncertain": false
+          },
+          {
+            "name": "Кюфте/Кебапче на скара",
+            "portion": "100 г",
+            "priceCents": 112,
+            "uncertain": false
+          },
+          {
+            "name": "Домашен конски суджук на скара",
+            "portion": "200 г",
+            "priceCents": 455,
+            "uncertain": false
+          }
+        ]
+      },
+      {
+        "name": "ДЕСЕРТ",
+        "items": [
+          {
+            "name": "Домашна бисквитена торта",
+            "portion": null,
+            "priceCents": 290,
+            "uncertain": false
+          },
+          {
+            "name": "Крем карамел",
+            "portion": null,
+            "priceCents": 200,
+            "uncertain": false
+          },
+          {
+            "name": "Порция диня",
+            "portion": null,
+            "priceCents": 220,
+            "uncertain": false
+          },
+          {
+            "name": "Мляко с ориз и канела",
+            "portion": null,
+            "priceCents": 179,
+            "uncertain": false
+          },
+          {
+            "name": "Протеинов шоколадов мус",
+            "portion": null,
+            "priceCents": 290,
+            "uncertain": false
+          },
+          {
+            "name": "Млечен пудинг с чиа и плодове",
+            "portion": null,
+            "priceCents": 205,
+            "uncertain": false
+          }
+        ]
+      },
+      {
+        "name": "САЛАТИ",
+        "items": [
+          {
+            "name": "Шопска салата/единично опакована/",
+            "portion": "350 г",
+            "priceCents": 302,
+            "uncertain": false
+          },
+          {
+            "name": "Сала Капрезе с моцарела и песто /единично опакована/",
+            "portion": "300 г",
+            "priceCents": 450,
+            "uncertain": false
+          },
+          {
+            "name": "Салата от краставици, репички, царевица и сирене",
+            "portion": "100 г",
+            "priceCents": 92,
+            "uncertain": false
+          },
+          {
+            "name": "Салата от мариновани печени чушки",
+            "portion": "100 г",
+            "priceCents": 92,
+            "uncertain": false
+          },
+          {
+            "name": "Салата табуле/",
+            "portion": "100 г",
+            "priceCents": 92,
+            "uncertain": false
+          },
+          {
+            "name": "Салата домати и краставици",
+            "portion": "100 г",
+            "priceCents": 92,
+            "uncertain": false
+          },
+          {
+            "name": "Зелена салата с краставици и репички",
+            "portion": "100 г",
+            "priceCents": 92,
+            "uncertain": false
+          },
+          {
+            "name": "Салата моркови със семена",
+            "portion": "100 г",
+            "priceCents": 92,
+            "uncertain": false
+          },
+          {
+            "name": "Салата зеле и моркови",
+            "portion": "100 г",
+            "priceCents": 92,
+            "uncertain": false
+          },
+          {
+            "name": "Картофена салата",
+            "portion": "100 г",
+            "priceCents": 92,
+            "uncertain": false
+          },
+          {
+            "name": "Салата Тирокафтери",
+            "portion": "50 г",
+            "priceCents": 80,
+            "uncertain": false
+          },
+          {
+            "name": "Салата Дзадзики",
+            "portion": "50 г",
+            "priceCents": 80,
+            "uncertain": false
+          },
+          {
+            "name": "Домашна лютеница",
+            "portion": "50 г",
+            "priceCents": 51,
+            "uncertain": false
+          }
+        ]
+      }
+    ]
+  },
+  "verificationTranscript": {
+    "uncertain": false,
+    "uncertaintyNotes": [],
+    "categories": [
+      {
+        "name": "СУПИ",
+        "items": [
+          {
+            "name": "Супа топчета",
+            "portion": "350 мл",
+            "priceCents": 270,
+            "uncertain": false
+          },
+          {
+            "name": "Крем супа от червена леща",
+            "portion": "350 мл",
+            "priceCents": 250,
+            "uncertain": false
+          },
+          {
+            "name": "Таратор",
+            "portion": "350 мл",
+            "priceCents": 180,
+            "uncertain": false
+          }
+        ]
+      },
+      {
+        "name": "ОСНОВНИ",
+        "items": [
+          {
+            "name": "Панирано пилешко филе със сусам, с гарнитура",
+            "portion": "350 г",
+            "priceCents": 510,
+            "uncertain": false
+          },
+          {
+            "name": "Пилешко филе със зеленчуци и нудли, по азиатски",
+            "portion": "350 г",
+            "priceCents": 510,
+            "uncertain": false
+          },
+          {
+            "name": "Мариновани карета от свинско контра филе на плоча, с гарнитура",
+            "portion": "350 г",
+            "priceCents": 510,
+            "uncertain": false
+          },
+          {
+            "name": "Запечено свинско джоланче с ориз на фурна",
+            "portion": "350 г",
+            "priceCents": 480,
+            "uncertain": false
+          },
+          {
+            "name": "Папуцаки , с гарнитура /пълнен патладжан с мляно месо и моцарела/",
+            "portion": "350 г",
+            "priceCents": 490,
+            "uncertain": false
+          },
+          {
+            "name": "Класическа Мусака",
+            "portion": "350 г",
+            "priceCents": 450,
+            "uncertain": false
+          },
+          {
+            "name": "Картофени кюфтета, с млечен сос и гарнитура",
+            "portion": "350 г",
+            "priceCents": 430,
+            "uncertain": false
+          },
+          {
+            "name": "Пържени чушки с яйца и сирене",
+            "portion": "350 г",
+            "priceCents": 410,
+            "uncertain": false
+          },
+          {
+            "name": "Булгур със спанак и манатарки",
+            "portion": "350 г",
+            "priceCents": 410,
+            "uncertain": false
+          },
+          {
+            "name": "Филе от лаврак на плоча, с гарнитура",
+            "portion": "350 г",
+            "priceCents": 880,
+            "uncertain": false
+          }
+        ]
+      },
+      {
+        "name": "СКАРА",
+        "items": [
+          {
+            "name": "Мариновани свински ребърца на скара",
+            "portion": "200 г",
+            "priceCents": 348,
+            "uncertain": false
+          },
+          {
+            "name": "Кралски котлет с цяло ребро на скара",
+            "portion": "300 г",
+            "priceCents": 660,
+            "uncertain": false
+          },
+          {
+            "name": "Пилешко филе на скара",
+            "portion": "130 г",
+            "priceCents": 302,
+            "uncertain": false
+          },
+          {
+            "name": "Пържола от пилешко бутче на скара",
+            "portion": "150 г",
+            "priceCents": 307,
+            "uncertain": false
+          },
+          {
+            "name": "Шишче от пилешко филе със зеленчуци",
+            "portion": "100 г",
+            "priceCents": 179,
+            "uncertain": false
+          },
+          {
+            "name": "Кюфте/Кебапче на скара",
+            "portion": "100 г",
+            "priceCents": 112,
+            "uncertain": false
+          },
+          {
+            "name": "Домашен конски суджук на скара",
+            "portion": "200 г",
+            "priceCents": 455,
+            "uncertain": false
+          }
+        ]
+      },
+      {
+        "name": "ГАРНИТУРИ",
+        "items": [
+          {
+            "name": "Пържени уеджис картофки",
+            "portion": "100 г",
+            "priceCents": 92,
+            "uncertain": false
+          },
+          {
+            "name": "Печени картофки на фурна",
+            "portion": "100 г",
+            "priceCents": 92,
+            "uncertain": false
+          },
+          {
+            "name": "Задушени зеленчуци",
+            "portion": "100 г",
+            "priceCents": 92,
+            "uncertain": false
+          },
+          {
+            "name": "Задушен ориз",
+            "portion": "100 г",
+            "priceCents": 92,
+            "uncertain": false
+          },
+          {
+            "name": "Картофено пюре",
+            "portion": "100 г",
+            "priceCents": 92,
+            "uncertain": false
+          }
+        ]
+      },
+      {
+        "name": "ДЕСЕРТ",
+        "items": [
+          {
+            "name": "Домашна бисквитена торта",
+            "portion": null,
+            "priceCents": 290,
+            "uncertain": false
+          },
+          {
+            "name": "Крем карамел",
+            "portion": null,
+            "priceCents": 200,
+            "uncertain": false
+          },
+          {
+            "name": "Порция диня",
+            "portion": null,
+            "priceCents": 220,
+            "uncertain": false
+          },
+          {
+            "name": "Мляко с ориз и канела",
+            "portion": null,
+            "priceCents": 179,
+            "uncertain": false
+          },
+          {
+            "name": "Протеинов шоколадов мус",
+            "portion": null,
+            "priceCents": 290,
+            "uncertain": false
+          },
+          {
+            "name": "Млечен пудинг с чиа и плодове",
+            "portion": null,
+            "priceCents": 205,
+            "uncertain": false
+          }
+        ]
+      },
+      {
+        "name": "САЛАТИ",
+        "items": [
+          {
+            "name": "Шопска салата/единично опакована/",
+            "portion": "350 г",
+            "priceCents": 302,
+            "uncertain": false
+          },
+          {
+            "name": "Сала Капрезе с моцарела и песто/единично опакована/",
+            "portion": "300 г",
+            "priceCents": 450,
+            "uncertain": false
+          },
+          {
+            "name": "Салата от краставици, репички, царевица и сирене",
+            "portion": "100 г",
+            "priceCents": 92,
+            "uncertain": false
+          },
+          {
+            "name": "Салата от мариновани печени чушки",
+            "portion": "100 г",
+            "priceCents": 92,
+            "uncertain": false
+          },
+          {
+            "name": "Салата табуле/",
+            "portion": "100 г",
+            "priceCents": 92,
+            "uncertain": false
+          },
+          {
+            "name": "Салата домати и краставици",
+            "portion": "100 г",
+            "priceCents": 92,
+            "uncertain": false
+          },
+          {
+            "name": "Зелена салата с краставици и репички",
+            "portion": "100 г",
+            "priceCents": 92,
+            "uncertain": false
+          },
+          {
+            "name": "Салата моркови със семена",
+            "portion": "100 г",
+            "priceCents": 92,
+            "uncertain": false
+          },
+          {
+            "name": "Салата зеле и моркови",
+            "portion": "100 г",
+            "priceCents": 92,
+            "uncertain": false
+          },
+          {
+            "name": "Картофена салата",
+            "portion": "100 г",
+            "priceCents": 92,
+            "uncertain": false
+          },
+          {
+            "name": "Салата Тирокафтери",
+            "portion": "50 г",
+            "priceCents": 80,
+            "uncertain": false
+          },
+          {
+            "name": "Салата Дзадзики",
+            "portion": "50 г",
+            "priceCents": 80,
+            "uncertain": false
+          },
+          {
+            "name": "Домашна лютеничка",
+            "portion": "50 г",
+            "priceCents": 51,
+            "uncertain": false
+          }
+        ]
+      }
+    ]
+  },
+  "verification": {
+    "approved": false,
+    "uncertain": false,
+    "issues": [
+      {
+        "category": "ГАРНИТУРИ",
+        "item": "",
+        "field": "category",
+        "explanation": "Category name disagrees: extraction \"ГАРНИТУРИ\", blind verification \"СКАРА\""
+      },
+      {
+        "category": "ГАРНИТУРИ",
+        "item": "",
+        "field": "extra-item",
+        "explanation": "Item count disagrees: extraction 5, blind verification 7"
+      },
+      {
+        "category": "ГАРНИТУРИ",
+        "item": "Пържени уеджис картофки",
+        "field": "name",
+        "explanation": "Name disagrees: extraction \"Пържени уеджис картофки\", blind verification \"Мариновани свински ребърца на скара\""
+      },
+      {
+        "category": "ГАРНИТУРИ",
+        "item": "Пържени уеджис картофки",
+        "field": "portion",
+        "explanation": "Portion disagrees: extraction \"100 г\", blind verification \"200 г\""
+      },
+      {
+        "category": "ГАРНИТУРИ",
+        "item": "Пържени уеджис картофки",
+        "field": "price",
+        "explanation": "Price disagrees: extraction 92, blind verification 348 cents"
+      },
+      {
+        "category": "ГАРНИТУРИ",
+        "item": "Печени картофки на фурна",
+        "field": "name",
+        "explanation": "Name disagrees: extraction \"Печени картофки на фурна\", blind verification \"Кралски котлет с цяло ребро на скара\""
+      },
+      {
+        "category": "ГАРНИТУРИ",
+        "item": "Печени картофки на фурна",
+        "field": "portion",
+        "explanation": "Portion disagrees: extraction \"100 г\", blind verification \"300 г\""
+      },
+      {
+        "category": "ГАРНИТУРИ",
+        "item": "Печени картофки на фурна",
+        "field": "price",
+        "explanation": "Price disagrees: extraction 92, blind verification 660 cents"
+      },
+      {
+        "category": "ГАРНИТУРИ",
+        "item": "Задушени зеленчуци",
+        "field": "name",
+        "explanation": "Name disagrees: extraction \"Задушени зеленчуци\", blind verification \"Пилешко филе на скара\""
+      },
+      {
+        "category": "ГАРНИТУРИ",
+        "item": "Задушени зеленчуци",
+        "field": "portion",
+        "explanation": "Portion disagrees: extraction \"100 г\", blind verification \"130 г\""
+      },
+      {
+        "category": "ГАРНИТУРИ",
+        "item": "Задушени зеленчуци",
+        "field": "price",
+        "explanation": "Price disagrees: extraction 92, blind verification 302 cents"
+      },
+      {
+        "category": "ГАРНИТУРИ",
+        "item": "Задушен ориз",
+        "field": "name",
+        "explanation": "Name disagrees: extraction \"Задушен ориз\", blind verification \"Пържола от пилешко бутче на скара\""
+      },
+      {
+        "category": "ГАРНИТУРИ",
+        "item": "Задушен ориз",
+        "field": "portion",
+        "explanation": "Portion disagrees: extraction \"100 г\", blind verification \"150 г\""
+      },
+      {
+        "category": "ГАРНИТУРИ",
+        "item": "Задушен ориз",
+        "field": "price",
+        "explanation": "Price disagrees: extraction 92, blind verification 307 cents"
+      },
+      {
+        "category": "ГАРНИТУРИ",
+        "item": "Картофено пюре",
+        "field": "name",
+        "explanation": "Name disagrees: extraction \"Картофено пюре\", blind verification \"Шишче от пилешко филе със зеленчуци\""
+      },
+      {
+        "category": "ГАРНИТУРИ",
+        "item": "Картофено пюре",
+        "field": "price",
+        "explanation": "Price disagrees: extraction 92, blind verification 179 cents"
+      },
+      {
+        "category": "ГАРНИТУРИ",
+        "item": "Кюфте/Кебапче на скара",
+        "field": "extra-item",
+        "explanation": "Item 6 exists in only one transcription"
+      },
+      {
+        "category": "ГАРНИТУРИ",
+        "item": "Домашен конски суджук на скара",
+        "field": "extra-item",
+        "explanation": "Item 7 exists in only one transcription"
+      },
+      {
+        "category": "СКАРА",
+        "item": "",
+        "field": "category",
+        "explanation": "Category name disagrees: extraction \"СКАРА\", blind verification \"ГАРНИТУРИ\""
+      },
+      {
+        "category": "СКАРА",
+        "item": "",
+        "field": "missing-item",
+        "explanation": "Item count disagrees: extraction 7, blind verification 5"
+      },
+      {
+        "category": "СКАРА",
+        "item": "Мариновани свински ребърца на скара",
+        "field": "name",
+        "explanation": "Name disagrees: extraction \"Мариновани свински ребърца на скара\", blind verification \"Пържени уеджис картофки\""
+      },
+      {
+        "category": "СКАРА",
+        "item": "Мариновани свински ребърца на скара",
+        "field": "portion",
+        "explanation": "Portion disagrees: extraction \"200 г\", blind verification \"100 г\""
+      },
+      {
+        "category": "СКАРА",
+        "item": "Мариновани свински ребърца на скара",
+        "field": "price",
+        "explanation": "Price disagrees: extraction 348, blind verification 92 cents"
+      },
+      {
+        "category": "СКАРА",
+        "item": "Кралски котлет с цяло ребро на скара",
+        "field": "name",
+        "explanation": "Name disagrees: extraction \"Кралски котлет с цяло ребро на скара\", blind verification \"Печени картофки на фурна\""
+      },
+      {
+        "category": "СКАРА",
+        "item": "Кралски котлет с цяло ребро на скара",
+        "field": "portion",
+        "explanation": "Portion disagrees: extraction \"300 г\", blind verification \"100 г\""
+      },
+      {
+        "category": "СКАРА",
+        "item": "Кралски котлет с цяло ребро на скара",
+        "field": "price",
+        "explanation": "Price disagrees: extraction 660, blind verification 92 cents"
+      },
+      {
+        "category": "СКАРА",
+        "item": "Пилешко филе на скара",
+        "field": "name",
+        "explanation": "Name disagrees: extraction \"Пилешко филе на скара\", blind verification \"Задушени зеленчуци\""
+      },
+      {
+        "category": "СКАРА",
+        "item": "Пилешко филе на скара",
+        "field": "portion",
+        "explanation": "Portion disagrees: extraction \"130 г\", blind verification \"100 г\""
+      },
+      {
+        "category": "СКАРА",
+        "item": "Пилешко филе на скара",
+        "field": "price",
+        "explanation": "Price disagrees: extraction 302, blind verification 92 cents"
+      },
+      {
+        "category": "СКАРА",
+        "item": "Пържола от пилешко бутче на скара",
+        "field": "name",
+        "explanation": "Name disagrees: extraction \"Пържола от пилешко бутче на скара\", blind verification \"Задушен ориз\""
+      },
+      {
+        "category": "СКАРА",
+        "item": "Пържола от пилешко бутче на скара",
+        "field": "portion",
+        "explanation": "Portion disagrees: extraction \"150 г\", blind verification \"100 г\""
+      },
+      {
+        "category": "СКАРА",
+        "item": "Пържола от пилешко бутче на скара",
+        "field": "price",
+        "explanation": "Price disagrees: extraction 307, blind verification 92 cents"
+      },
+      {
+        "category": "СКАРА",
+        "item": "Шишче от пилешко филе със зеленчуци",
+        "field": "name",
+        "explanation": "Name disagrees: extraction \"Шишче от пилешко филе със зеленчуци\", blind verification \"Картофено пюре\""
+      },
+      {
+        "category": "СКАРА",
+        "item": "Шишче от пилешко филе със зеленчуци",
+        "field": "price",
+        "explanation": "Price disagrees: extraction 179, blind verification 92 cents"
+      },
+      {
+        "category": "СКАРА",
+        "item": "Кюфте/Кебапче на скара",
+        "field": "missing-item",
+        "explanation": "Item 6 exists in only one transcription"
+      },
+      {
+        "category": "СКАРА",
+        "item": "Домашен конски суджук на скара",
+        "field": "missing-item",
+        "explanation": "Item 7 exists in only one transcription"
+      },
+      {
+        "category": "САЛАТИ",
+        "item": "Сала Капрезе с моцарела и песто /единично опакована/",
+        "field": "name",
+        "explanation": "Name disagrees: extraction \"Сала Капрезе с моцарела и песто /единично опакована/\", blind verification \"Сала Капрезе с моцарела и песто/единично опакована/\""
+      },
+      {
+        "category": "САЛАТИ",
+        "item": "Домашна лютеница",
+        "field": "name",
+        "explanation": "Name disagrees: extraction \"Домашна лютеница\", blind verification \"Домашна лютеничка\""
+      }
+    ]
+  }
+}
