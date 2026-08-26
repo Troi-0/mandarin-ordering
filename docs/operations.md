@@ -30,8 +30,12 @@ portions, and integer-cent prices and rejects every real disagreement.
 
 Once today's menu is ready, later scheduled runs exit before opening Facebook or
 calling Gemini. A changed, fully validated menu is committed to `data/menus/` and
-`data/current-menu.json`. A rejected result may create `data/review/YYYY-MM-DD.json`
-for a collaborator to inspect, but it cannot become the current menu.
+`data/current-menu.json`. After that commit is pushed, the importer sends a
+`menu-published` repository dispatch so GitHub Pages builds the new default-branch
+commit. This explicit dispatch is required because GitHub does not start another
+push-triggered workflow for commits made with the workflow `GITHUB_TOKEN`.
+A rejected result may create `data/review/YYYY-MM-DD.json` for a collaborator to
+inspect, but it cannot become the current menu and does not request a deployment.
 
 ## Safe live test
 

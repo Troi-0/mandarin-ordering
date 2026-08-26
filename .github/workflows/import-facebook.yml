@@ -54,8 +54,10 @@ jobs:
           if-no-files-found: ignore
           retention-days: 3
       - name: Commit changed menu or review draft
+        id: menu_commit
         if: ${{ always() && !inputs.dry_run }}
         run: |
+          pushed=false
           git config user.name "mandarin-menu-bot"
           git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
           git add data/current-menu.json data/menus data/review
@@ -64,7 +66,16 @@ jobs:
           else
             git commit -m "data: update Sofia menu $(date -u +%F)"
             git push
+            pushed=true
           fi
+          echo "pushed=$pushed" >> "$GITHUB_OUTPUT"
+      - name: Deploy successfully published menu
+        if: steps.importer.outcome == 'success' && steps.menu_commit.outputs.pushed == 'true'
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          gh api --method POST "repos/${GITHUB_REPOSITORY}/dispatches" \
+            -f event_type=menu-published
       - name: Keep rejected extraction unpublished
         if: steps.importer.outcome == 'failure'
         env:

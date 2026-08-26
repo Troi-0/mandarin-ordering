@@ -27,6 +27,8 @@ build validation.
   the free tier with billing disabled; there is no paid fallback.
 - Failed or uncertain extraction writes a draft under `data/review/` and never
   replaces the current menu.
+- A successful import explicitly requests a Pages deployment after pushing the
+  ready menu. Draft-only, dry-run, skipped, and unchanged imports do not deploy.
 - A manually dispatched Facebook workflow defaults to **dry run**: it bypasses
   the already-ready shortcut, exercises Facebook and two blind Gemini
   transcriptions, compares them deterministically, uploads a short-lived report
