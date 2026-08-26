@@ -32,6 +32,27 @@ describe('Facebook embedded post parsing', () => {
     expect(extractFacebookCandidatesFromHtml(`${duplicate}${duplicate}`)).toHaveLength(1)
   })
 
+  it('decodes escaped HTTPS image URLs and constructs the canonical Page permalink', () => {
+    const [candidate] = extractFacebookCandidatesFromHtml(story('444', 400))
+    expect(candidate).toEqual({
+      postId: '444',
+      creationTime: 400,
+      imageUrl: 'https://example.com/menu.jpg',
+      postUrl: `https://www.facebook.com/permalink.php?story_fbid=444&id=${PAGE_ID}`,
+    })
+  })
+
+  it('supports legacy Page author records', () => {
+    const html = `{"actor_id":"${PAGE_ID}","post_id":"555","creation_time":500,"photo_image":{"uri":"https:\\/\\/example.com\\/legacy.jpg"}}`
+    expect(extractFacebookCandidatesFromHtml(html)[0]?.postId).toBe('555')
+  })
+
+  it('rejects non-HTTPS images and unsafe timestamps', () => {
+    const insecure = `{"short_name":"Author","id":"${PAGE_ID}","post_id":"666","creation_time":600,"photo_image":{"uri":"http:\\/\\/example.com\\/menu.jpg"}}`
+    const unsafeTime = `{"short_name":"Author","id":"${PAGE_ID}","post_id":"777","creation_time":999999999999999999,"photo_image":{"uri":"https:\\/\\/example.com\\/menu.jpg"}}`
+    expect(extractFacebookCandidatesFromHtml(`${insecure}${unsafeTime}`)).toEqual([])
+  })
+
   it('selects an explicitly targeted historical post for a safe benchmark', () => {
     const candidates = extractFacebookCandidatesFromHtml([
       story('111', 100),

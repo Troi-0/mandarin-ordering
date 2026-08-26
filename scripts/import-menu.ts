@@ -1,4 +1,3 @@
-import { createHash } from 'node:crypto'
 import { mkdir, readFile, writeFile } from 'node:fs/promises'
 import path from 'node:path'
 import { fileURLToPath } from 'node:url'
@@ -6,17 +5,16 @@ import { fetchFacebookMenu } from './lib/facebook.ts'
 import {
   compareTranscriptions,
   extractMenu,
-  FREE_GEMINI_MODEL,
   verifyMenu,
   type ExtractedMenu,
   type Verification,
 } from './lib/gemini.ts'
+import { imageSha256, menuFromExtraction } from './lib/menu-build.ts'
 import { sofiaDate } from '../src/lib/date.ts'
 import {
   assertMenuInvariants,
   FACEBOOK_PAGE_URL,
   menuSchema,
-  PAGE_ID,
   type Menu,
 } from '../src/lib/menu-schema.ts'
 
@@ -27,56 +25,6 @@ function dryRunReportPath(): string {
   const configuredPath = process.env.IMPORT_REPORT_PATH?.trim()
   if (!configuredPath) throw new Error('IMPORT_REPORT_PATH is required when IMPORT_DRY_RUN=true')
   return path.resolve(configuredPath)
-}
-
-function stableId(prefix: string, value: string): string {
-  return `${prefix}-${createHash('sha256').update(value).digest('hex').slice(0, 12)}`
-}
-
-function imageSha256(image: Uint8Array): string {
-  return createHash('sha256').update(image).digest('hex')
-}
-
-function menuFromExtraction(options: {
-  date: string
-  sourcePostId: string
-  sourcePostUrl: string
-  publishedAt: string
-  image: Uint8Array
-  method: 'facebook' | 'manual'
-  extracted: ExtractedMenu
-}): Menu {
-  const menu = menuSchema.parse({
-    date: options.date,
-    restaurant: 'Mandarin House',
-    currency: 'EUR',
-    source: {
-      pageId: PAGE_ID,
-      postId: options.sourcePostId,
-      postUrl: options.sourcePostUrl,
-      publishedAt: options.publishedAt,
-      imageSha256: imageSha256(options.image),
-    },
-    importedAt: new Date().toISOString(),
-    importMethod: options.method,
-    validation: {
-      extractedBy: FREE_GEMINI_MODEL,
-      verifiedBy: `${FREE_GEMINI_MODEL}:blind-transcription`,
-      uncertain: false,
-    },
-    categories: options.extracted.categories.map((category, categoryIndex) => ({
-      id: stableId('category', `${categoryIndex}|${category.name}`),
-      name: category.name,
-      items: category.items.map((item, itemIndex) => ({
-        id: stableId('item', `${category.name}|${itemIndex}|${item.name}|${item.portion ?? ''}`),
-        name: item.name,
-        ...(item.portion ? { portion: item.portion } : {}),
-        priceCents: item.priceCents,
-      })),
-    })),
-  })
-  assertMenuInvariants(menu)
-  return menu
 }
 
 async function writeDraft(

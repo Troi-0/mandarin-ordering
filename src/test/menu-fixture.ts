@@ -35,3 +35,17 @@ export const menuFixture: Menu = {
     },
   ],
 }
+
+export function createValidMenuFixture(): Menu {
+  const menu = structuredClone(menuFixture)
+  menu.categories = menu.categories.map((category, categoryIndex) => ({
+    ...category,
+    items: Array.from({ length: 4 }, (_, itemIndex) => ({
+      id: `${category.id}-${itemIndex + 1}`,
+      name: `${category.name} ястие ${itemIndex + 1}`,
+      portion: itemIndex === 3 ? undefined : `${250 + itemIndex * 50} г`,
+      priceCents: 200 + categoryIndex * 100 + itemIndex * 50,
+    })),
+  }))
+  return menu
+}
