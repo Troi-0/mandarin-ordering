@@ -120,6 +120,9 @@ remain live imports, and unchecking dry run is an explicit publishing action.
 
 - If Facebook markup changes, Gemini is unavailable, the free quota is exhausted,
   or extraction is uncertain, the workflow fails without replacing the menu.
+- Direct Gemini calls retry transient 408, 429, and 5xx responses at most twice
+  with short exponential backoff. They never switch models or paid service tiers;
+  permanent errors and exhausted retries still fail closed.
 - The browser checks the Sofia date independently. A stale embedded menu renders
   an unavailable screen and cannot be selected or shared.
 - GitHub may disable scheduled workflows in a public repository after 60 days

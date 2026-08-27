@@ -1,13 +1,20 @@
 import { readFile } from 'node:fs/promises'
-import { describe, expect, it } from 'vitest'
+import { afterEach, describe, expect, it, vi } from 'vitest'
 import { menuSchema } from '../../src/lib/menu-schema.ts'
 import {
   comparePriceBenchmark,
   compareTranscriptions,
   extractedMenuSchema,
+  generateJson,
   normalizeTranscription,
   type ExtractedMenu,
 } from './gemini.ts'
+
+afterEach(() => {
+  vi.useRealTimers()
+  vi.unstubAllEnvs()
+  vi.unstubAllGlobals()
+})
 
 async function humanVerifiedTranscript(): Promise<ExtractedMenu> {
   const menu = menuSchema.parse(
@@ -29,6 +36,35 @@ async function humanVerifiedTranscript(): Promise<ExtractedMenu> {
 }
 
 describe('blind Gemini transcription comparison', () => {
+  it('retries transient Gemini failures with bounded backoff and no model fallback', async () => {
+    vi.useFakeTimers()
+    vi.stubEnv('GEMINI_API_KEY', 'test-key')
+    const fetchMock = vi.fn()
+      .mockResolvedValueOnce(new Response('temporarily unavailable', { status: 503 }))
+      .mockResolvedValueOnce(new Response(JSON.stringify({
+        candidates: [{ content: { parts: [{ text: '{"ok":true}' }] } }],
+      }), { status: 200, headers: { 'content-type': 'application/json' } }))
+    vi.stubGlobal('fetch', fetchMock)
+
+    const result = generateJson('read menu', new Uint8Array([1, 2]), 'image/jpeg', {})
+    await vi.runAllTimersAsync()
+
+    await expect(result).resolves.toEqual({ ok: true })
+    expect(fetchMock).toHaveBeenCalledTimes(2)
+    expect(fetchMock.mock.calls.every(([url]) => String(url).includes('gemini-3.6-flash')))
+      .toBe(true)
+  })
+
+  it('does not retry permanent Gemini client errors', async () => {
+    vi.stubEnv('GEMINI_API_KEY', 'test-key')
+    const fetchMock = vi.fn(async () => new Response('bad request', { status: 400 }))
+    vi.stubGlobal('fetch', fetchMock)
+
+    await expect(generateJson('read menu', new Uint8Array([1]), 'image/jpeg', {}))
+      .rejects.toThrow('Free Gemini request failed (400)')
+    expect(fetchMock).toHaveBeenCalledOnce()
+  })
+
   it('normalizes printed gram abbreviations before comparison and publication', async () => {
     const transcript = await humanVerifiedTranscript()
     transcript.categories[1].items[0].portion = '350гр.'
