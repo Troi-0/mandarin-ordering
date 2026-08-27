@@ -2,6 +2,7 @@ import { readFile } from 'node:fs/promises'
 import { describe, expect, it } from 'vitest'
 import { menuSchema } from '../../src/lib/menu-schema.ts'
 import {
+  comparePriceBenchmark,
   compareTranscriptions,
   extractedMenuSchema,
   normalizeTranscription,
@@ -208,6 +209,56 @@ describe('blind Gemini transcription comparison', () => {
       approved: false,
       uncertain: true,
       issues: [],
+    })
+  })
+
+  it('keeps the human benchmark price-focused across reordered and display-normalized names', async () => {
+    const humanReference = await humanVerifiedTranscript()
+    const extracted = structuredClone(humanReference)
+    extracted.categories.reverse()
+    const desserts = extracted.categories.find((category) => category.name === 'Десерти')
+    const salads = extracted.categories.find((category) => category.name === 'Салати')
+    if (!desserts || !salads) throw new Error('Expected dessert and salad categories')
+    desserts.name = 'ДЕСЕРТ'
+    salads.items[1].name = salads.items[1].name.replace(' /', '/')
+
+    expect(comparePriceBenchmark(extracted, humanReference)).toEqual({
+      approved: true,
+      uncertain: false,
+      issues: [],
+    })
+  })
+
+  it('rejects any human-benchmark price, portion, structure, or uncertainty change', async () => {
+    const humanReference = await humanVerifiedTranscript()
+    const wrongPrice = structuredClone(humanReference)
+    wrongPrice.categories[0].items[0].priceCents += 1
+    expect(comparePriceBenchmark(wrongPrice, humanReference)).toMatchObject({
+      approved: false,
+      issues: [expect.objectContaining({ field: 'price' })],
+    })
+
+    const wrongPortion = structuredClone(humanReference)
+    wrongPortion.categories[0].items[0].portion = '300 мл'
+    expect(comparePriceBenchmark(wrongPortion, humanReference)).toMatchObject({
+      approved: false,
+      issues: [expect.objectContaining({ field: 'portion' })],
+    })
+
+    const missingItem = structuredClone(humanReference)
+    missingItem.categories[0].items.pop()
+    expect(comparePriceBenchmark(missingItem, humanReference)).toMatchObject({
+      approved: false,
+      issues: expect.arrayContaining([
+        expect.objectContaining({ field: expect.stringMatching(/^(missing|extra)-item$/) }),
+      ]),
+    })
+
+    const uncertain = structuredClone(humanReference)
+    uncertain.categories[0].items[0].uncertain = true
+    expect(comparePriceBenchmark(uncertain, humanReference)).toMatchObject({
+      approved: false,
+      uncertain: true,
     })
   })
 })

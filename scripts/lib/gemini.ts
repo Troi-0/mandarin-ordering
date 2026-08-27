@@ -194,6 +194,14 @@ function normalizedCategoryKey(name: string): string {
     .toLocaleUpperCase('bg-BG')
 }
 
+function normalizedBenchmarkCategoryKey(name: string): string {
+  const key = normalizedCategoryKey(name).replace(/[^\p{L}\p{N}]+/gu, '')
+  // Human-reviewed display labels may use a Bulgarian plural while the source
+  // image uses singular (for example ДЕСЕРТ/ДЕСЕРТИ). This benchmark protects
+  // numeric menu data, so tolerate only that narrow category-label difference.
+  return key.endsWith('И') && key.length > 4 ? key.slice(0, -1) : key
+}
+
 function categoriesByNormalizedName(categories: ExtractedMenu['categories']) {
   const indexed = new Map<string, ExtractedMenu['categories']>()
   for (const category of categories) {
@@ -205,6 +213,111 @@ function categoriesByNormalizedName(categories: ExtractedMenu['categories']) {
   return indexed
 }
 
+function transcriptionHasUncertainty(transcript: ExtractedMenu): boolean {
+  return transcript.uncertain
+    || transcript.uncertaintyNotes.length > 0
+    || transcript.categories.some((category) => category.items.some((item) => item.uncertain))
+}
+
+export function comparePriceBenchmark(
+  extracted: ExtractedMenu,
+  humanReference: ExtractedMenu,
+): Verification {
+  const issues: Verification['issues'] = []
+  const addIssue = (issue: Verification['issues'][number]) => {
+    if (issues.length < MAX_VERIFICATION_ISSUES) issues.push(issue)
+  }
+  const categoriesByKey = (categories: ExtractedMenu['categories']) => {
+    const indexed = new Map<string, ExtractedMenu['categories']>()
+    for (const category of categories) {
+      const key = normalizedBenchmarkCategoryKey(category.name)
+      const matches = indexed.get(key) ?? []
+      matches.push(category)
+      indexed.set(key, matches)
+    }
+    return indexed
+  }
+
+  if (extracted.categories.length !== humanReference.categories.length) {
+    addIssue({
+      category: '',
+      item: '',
+      field: 'category',
+      explanation: `Category count disagrees: extraction ${extracted.categories.length}, human reference ${humanReference.categories.length}`,
+    })
+  }
+
+  const extractedCategories = categoriesByKey(extracted.categories)
+  const referenceCategories = categoriesByKey(humanReference.categories)
+  const categoryKeys = new Set([...extractedCategories.keys(), ...referenceCategories.keys()])
+
+  for (const categoryKey of categoryKeys) {
+    const extractedMatches = extractedCategories.get(categoryKey) ?? []
+    const referenceMatches = referenceCategories.get(categoryKey) ?? []
+    const categoryName = extractedMatches[0]?.name ?? referenceMatches[0]?.name ?? categoryKey
+    if (extractedMatches.length !== 1 || referenceMatches.length !== 1) {
+      addIssue({
+        category: categoryName,
+        item: '',
+        field: 'category',
+        explanation: `Category cannot be paired uniquely: extraction ${extractedMatches.length}, human reference ${referenceMatches.length}`,
+      })
+      continue
+    }
+    const extractedCategory = extractedMatches[0]
+    const referenceCategory = referenceMatches[0]
+    if (!extractedCategory || !referenceCategory) continue
+    if (extractedCategory.items.length !== referenceCategory.items.length) {
+      addIssue({
+        category: extractedCategory.name,
+        item: '',
+        field: extractedCategory.items.length > referenceCategory.items.length
+          ? 'missing-item'
+          : 'extra-item',
+        explanation: `Item count disagrees: extraction ${extractedCategory.items.length}, human reference ${referenceCategory.items.length}`,
+      })
+    }
+    const itemCount = Math.max(extractedCategory.items.length, referenceCategory.items.length)
+    for (let itemIndex = 0; itemIndex < itemCount; itemIndex += 1) {
+      const extractedItem = extractedCategory.items[itemIndex]
+      const referenceItem = referenceCategory.items[itemIndex]
+      if (!extractedItem || !referenceItem) {
+        addIssue({
+          category: extractedCategory.name,
+          item: extractedItem?.name ?? referenceItem?.name ?? '',
+          field: extractedItem ? 'missing-item' : 'extra-item',
+          explanation: `Item ${itemIndex + 1} exists in only one benchmark transcript`,
+        })
+        continue
+      }
+      if (extractedItem.portion !== referenceItem.portion) {
+        addIssue({
+          category: extractedCategory.name,
+          item: extractedItem.name,
+          field: 'portion',
+          explanation: `Portion disagrees: extraction "${extractedItem.portion ?? 'none'}", human reference "${referenceItem.portion ?? 'none'}"`,
+        })
+      }
+      if (extractedItem.priceCents !== referenceItem.priceCents) {
+        addIssue({
+          category: extractedCategory.name,
+          item: extractedItem.name,
+          field: 'price',
+          explanation: `Price disagrees: extraction ${extractedItem.priceCents}, human reference ${referenceItem.priceCents} cents`,
+        })
+      }
+    }
+  }
+
+  const uncertain = transcriptionHasUncertainty(extracted)
+    || transcriptionHasUncertainty(humanReference)
+  return verificationSchema.parse({
+    approved: !uncertain && issues.length === 0,
+    uncertain,
+    issues,
+  })
+}
+
 export function compareTranscriptions(
   extracted: ExtractedMenu,
   verificationTranscript: ExtractedMenu,
@@ -213,11 +326,6 @@ export function compareTranscriptions(
   const addIssue = (issue: Verification['issues'][number]) => {
     if (issues.length < MAX_VERIFICATION_ISSUES) issues.push(issue)
   }
-  const hasUncertainty = (transcript: ExtractedMenu) =>
-    transcript.uncertain
-    || transcript.uncertaintyNotes.length > 0
-    || transcript.categories.some((category) => category.items.some((item) => item.uncertain))
-
   if (extracted.categories.length !== verificationTranscript.categories.length) {
     addIssue({
       category: '',
@@ -327,7 +435,8 @@ export function compareTranscriptions(
     }
   }
 
-  const uncertain = hasUncertainty(extracted) || hasUncertainty(verificationTranscript)
+  const uncertain = transcriptionHasUncertainty(extracted)
+    || transcriptionHasUncertainty(verificationTranscript)
   return verificationSchema.parse({
     approved: !uncertain && issues.length === 0,
     uncertain,

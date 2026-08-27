@@ -2,6 +2,7 @@ import { mkdir, readFile, writeFile } from 'node:fs/promises'
 import path from 'node:path'
 import { fetchFacebookMenu, type FacebookPostTarget } from './facebook.ts'
 import {
+  comparePriceBenchmark,
   compareTranscriptions,
   extractMenu,
   verifyMenu,
@@ -162,7 +163,7 @@ export function createMenuImporter(options: MenuImporterOptions) {
       ? referenceTranscript(source.benchmarkReference)
       : undefined
     const benchmark = benchmarkTranscript
-      ? compareTranscriptions(extracted, benchmarkTranscript)
+      ? comparePriceBenchmark(extracted, benchmarkTranscript)
       : undefined
     if (!verification.approved || (benchmark && !benchmark.approved)) {
       await writeDraft(source, extracted, verificationTranscript, verification, benchmark)
