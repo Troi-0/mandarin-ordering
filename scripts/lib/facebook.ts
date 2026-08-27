@@ -1,4 +1,4 @@
-import { chromium, type BrowserContext } from 'playwright'
+import { chromium, type Page } from 'playwright'
 import { FACEBOOK_PAGE_URL, PAGE_ID } from '../../src/lib/menu-schema.ts'
 
 export interface FacebookStoryCandidate {
@@ -84,21 +84,22 @@ export function extractTargetedPermalinkImage(
 }
 
 export async function targetedPermalinkCandidate(
-  context: BrowserContext,
+  page: Page,
   target: FacebookPostTarget,
 ): Promise<FacebookStoryCandidate | undefined> {
   if (!Number.isSafeInteger(target.creationTime) || Number(target.creationTime) <= 0) {
     return undefined
   }
   const postUrl = `https://www.facebook.com/permalink.php?story_fbid=${target.postId}&id=${PAGE_ID}`
-  const response = await context.request.get(postUrl, {
-    // Facebook returns HTTP 400 to Playwright's API client user agent for this
-    // public endpoint, while the same anonymous request succeeds for browsers.
-    headers: { referer: FACEBOOK_PAGE_URL, 'user-agent': 'Mozilla/5.0' },
-    timeout: 30_000,
+  // Use a real page navigation. Facebook currently returns HTTP 400 to
+  // Playwright's API-style request client even when the public browser page is
+  // available, and the browser page preserves the feed context and cookies.
+  const response = await page.goto(postUrl, {
+    waitUntil: 'domcontentloaded',
+    timeout: 45_000,
   })
-  if (!response.ok()) return undefined
-  const imageUrl = extractTargetedPermalinkImage(await response.text(), target)
+  if (!response?.ok()) return undefined
+  const imageUrl = extractTargetedPermalinkImage(await page.content(), target)
   if (!imageUrl) return undefined
   return {
     postId: target.postId,
@@ -260,7 +261,7 @@ export async function fetchFacebookMenu(target?: FacebookPostTarget): Promise<{
     // feed rotates older records out, so use same-document Open Graph metadata
     // from the exact permalink when a trusted reference supplies the timestamp.
     if (!candidate && target) {
-      candidate = await targetedPermalinkCandidate(context, target)
+      candidate = await targetedPermalinkCandidate(page, target)
     }
     if (!candidate) {
       const pageTitle = (await page.title()).slice(0, 120)

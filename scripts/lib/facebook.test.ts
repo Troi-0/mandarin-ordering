@@ -1,4 +1,4 @@
-import type { BrowserContext } from 'playwright'
+import type { Page } from 'playwright'
 import { describe, expect, it, vi } from 'vitest'
 import { PAGE_ID } from '../../src/lib/menu-schema.ts'
 import {
@@ -204,17 +204,14 @@ describe('Facebook embedded post parsing', () => {
   it('builds a targeted historical candidate only from a valid permalink response and trusted time', async () => {
     const postId = '1698896525575953'
     const imageUrl = 'https://scontent.example.fbcdn.net/menu.jpg?a=1&amp;b=2'
-    const response = {
-      ok: () => true,
-      text: async () => `
+    const html = `
         <meta property="og:url" content="https://www.facebook.com/${PAGE_ID}/posts/menu/${postId}/">
         <meta property="og:image" content="${imageUrl}">
-      `,
-    }
-    const get = vi.fn(async () => response)
-    const context = { request: { get } } as unknown as BrowserContext
+      `
+    const goto = vi.fn(async () => ({ ok: () => true }))
+    const page = { goto, content: vi.fn(async () => html) } as unknown as Page
 
-    await expect(targetedPermalinkCandidate(context, {
+    await expect(targetedPermalinkCandidate(page, {
       postId,
       creationTime: 1_777_000_000,
     })).resolves.toEqual({
@@ -223,30 +220,28 @@ describe('Facebook embedded post parsing', () => {
       imageUrl: 'https://scontent.example.fbcdn.net/menu.jpg?a=1&b=2',
       postUrl: `https://www.facebook.com/permalink.php?story_fbid=${postId}&id=${PAGE_ID}`,
     })
-    expect(get).toHaveBeenCalledWith(
+    expect(goto).toHaveBeenCalledWith(
       `https://www.facebook.com/permalink.php?story_fbid=${postId}&id=${PAGE_ID}`,
       expect.objectContaining({
-        headers: {
-          referer: expect.stringContaining(PAGE_ID),
-          'user-agent': 'Mozilla/5.0',
-        },
+        waitUntil: 'domcontentloaded',
       }),
     )
   })
 
   it('fails targeted permalink lookup closed for untrusted time, HTTP failure, or invalid metadata', async () => {
     const postId = '1698896525575953'
-    const context = (ok: boolean, html: string) => ({
-      request: { get: vi.fn(async () => ({ ok: () => ok, text: async () => html })) },
-    }) as unknown as BrowserContext
+    const page = (ok: boolean, html: string) => ({
+      goto: vi.fn(async () => ({ ok: () => ok })),
+      content: vi.fn(async () => html),
+    }) as unknown as Page
 
-    await expect(targetedPermalinkCandidate(context(true, ''), { postId }))
+    await expect(targetedPermalinkCandidate(page(true, ''), { postId }))
       .resolves.toBeUndefined()
-    await expect(targetedPermalinkCandidate(context(false, ''), {
+    await expect(targetedPermalinkCandidate(page(false, ''), {
       postId,
       creationTime: 1_777_000_000,
     })).resolves.toBeUndefined()
-    await expect(targetedPermalinkCandidate(context(true, '<html></html>'), {
+    await expect(targetedPermalinkCandidate(page(true, '<html></html>'), {
       postId,
       creationTime: 1_777_000_000,
     })).resolves.toBeUndefined()
