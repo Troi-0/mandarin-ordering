@@ -21,8 +21,9 @@ build validation.
 ## Daily import
 
 - `npm run import:facebook` reads the latest public Page post with Playwright.
-- GitHub schedules four off-peak attempts per hour from 08:07 through 11:52
-  Sofia time because its scheduled events are best-effort and can be dropped.
+- From Monday through Friday, GitHub schedules four off-peak attempts per hour
+  from 08:07 through 11:52 Sofia time because its scheduled events are
+  best-effort and can be dropped.
 - `npm run import:manual -- manual-inbox/YYYY-MM-DD.png` processes a manually
   uploaded image.
 - Both commands require `GEMINI_API_KEY`. The Google AI project must remain on

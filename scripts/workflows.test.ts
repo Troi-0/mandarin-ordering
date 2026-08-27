@@ -20,7 +20,7 @@ describe('GitHub workflow contracts', () => {
     const importer = await workflow('import-facebook.yml')
 
     expect(importer).toContain('timezone: Europe/Sofia')
-    expect(importer).toContain("cron: '7,22,37,52 8-11 * * *'")
+    expect(importer).toContain("cron: '7,22,37,52 8-11 * * 1-5'")
     expect(importer).not.toContain("cron: '0,30 8-11 * * *'")
     expect(importer).toContain('contents: write\n  actions: read')
     expect(importer).toContain('IMPORT_DRY_RUN: ${{ inputs.dry_run }}')

@@ -20,10 +20,11 @@ selections, or browser data.
 
 ## Daily behavior
 
-The scheduled workflow checks at 08:07, 08:22, 08:37, and 08:52, repeating that
-staggered cadence through 11:52 in the `Europe/Sofia` timezone. These off-peak,
-15-minute attempts reduce the chance of GitHub dropping a scheduled event under
-load. It parses Facebook's embedded JSON and accepts an image
+From Monday through Friday, the scheduled workflow checks at 08:07, 08:22,
+08:37, and 08:52, repeating that staggered cadence through 11:52 in the
+`Europe/Sofia` timezone. These off-peak, 15-minute attempts reduce the chance of
+GitHub dropping a scheduled event under load. It parses Facebook's embedded JSON
+and accepts an image
 only when the same structured post record directly owns the post ID, creation
 time, Mandarin House Page author, and one unambiguous Facebook CDN attachment.
 It sorts those records by embedded creation time, rejects anything not dated

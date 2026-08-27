@@ -4,7 +4,7 @@ on:
   schedule:
     # GitHub may drop scheduled jobs under load, especially near the start of
     # an hour. Four staggered attempts make the free scheduler more resilient.
-    - cron: '7,22,37,52 8-11 * * *'
+    - cron: '7,22,37,52 8-11 * * 1-5'
       timezone: Europe/Sofia
   workflow_dispatch:
     inputs:
