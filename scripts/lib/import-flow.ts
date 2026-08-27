@@ -220,8 +220,45 @@ export function createMenuImporter(options: MenuImporterOptions) {
     }
   }
 
-  async function runFacebook(benchmarkPath?: string): Promise<'skipped' | 'published' | 'unchanged' | 'dry-run'> {
+  async function runFacebook(
+    benchmarkPath?: string,
+    benchmarkImagePath?: string,
+  ): Promise<'skipped' | 'published' | 'unchanged' | 'dry-run'> {
     const benchmarkReference = await loadBenchmarkReference(benchmarkPath)
+    const requestedBenchmarkImage = benchmarkImagePath?.trim()
+    if (requestedBenchmarkImage) {
+      if (!benchmarkReference) {
+        throw new Error('A benchmark image requires IMPORT_BENCHMARK_MENU')
+      }
+      const match = requestedBenchmarkImage.match(
+        /^test-fixtures\/facebook\/(\d{4}-\d{2}-\d{2})\.(jpg|jpeg|png|webp)$/,
+      )
+      if (!match || match[1] !== benchmarkReference.date) {
+        throw new Error(
+          'Benchmark image must be test-fixtures/facebook/YYYY-MM-DD.ext and match the reference date',
+        )
+      }
+      const extension = match[2]
+      const mimeType = extension === 'png'
+        ? 'image/png'
+        : extension === 'webp'
+          ? 'image/webp'
+          : 'image/jpeg'
+      const image = await readFile(path.resolve(options.root, requestedBenchmarkImage))
+      if (image.byteLength > 8 * 1024 * 1024) {
+        throw new Error('Benchmark image exceeds the 8 MB limit')
+      }
+      return processImage({
+        image,
+        mimeType,
+        date: benchmarkReference.date,
+        sourcePostId: benchmarkReference.source.postId,
+        sourcePostUrl: benchmarkReference.source.postUrl,
+        publishedAt: benchmarkReference.source.publishedAt,
+        method: 'facebook',
+        benchmarkReference,
+      })
+    }
     if (!options.dryRun && await hasValidCurrentMenuForToday()) {
       process.stdout.write(`Today's menu (${sofiaDate(now())}) is already ready; skipping import\n`)
       return 'skipped'

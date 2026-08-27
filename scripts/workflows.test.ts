@@ -24,6 +24,7 @@ describe('GitHub workflow contracts', () => {
     expect(importer).not.toContain("cron: '0,30 8-11 * * *'")
     expect(importer).toContain('contents: write\n  actions: read')
     expect(importer).toContain('IMPORT_DRY_RUN: ${{ inputs.dry_run }}')
+    expect(importer).toContain('IMPORT_BENCHMARK_IMAGE: ${{ inputs.benchmark_image_path }}')
     expect(importer).toContain('menu-import-dry-run-${{ github.run_id }}')
     expect(importer).toContain("if: ${{ always() && !inputs.dry_run }}")
     expect(importer).toContain("if: steps.importer.outcome == 'success' && !inputs.dry_run")

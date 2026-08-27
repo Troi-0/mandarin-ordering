@@ -63,6 +63,11 @@ set **Optional human-verified reference** to `data/menus/2026-08-24.json`. This
 loads that reference's historical Facebook post, runs both live Gemini passes,
 and also compares every item name, portion, and price with the human reference.
 Benchmark mode is accepted only during a dry run and can never publish data.
+For a reproducible replay that does not depend on Facebook retaining historical
+feed markup, also select the matching archived source image under
+`test-fixtures/facebook/YYYY-MM-DD.jpg`. These fixtures are public menu images
+from the referenced posts; the importer requires an exact date match and still
+runs both live Gemini passes plus the human-reference comparison.
 If Facebook has rotated the post out of the Page feed, the targeted benchmark
 may use the exact permalink's Open Graph image only when its canonical URL
 contains both the expected Page ID and post ID and it exposes one Facebook-CDN

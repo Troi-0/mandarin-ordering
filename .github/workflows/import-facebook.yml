@@ -18,6 +18,11 @@ on:
         required: false
         default: ''
         type: string
+      benchmark_image_path:
+        description: Optional archived source image such as test-fixtures/facebook/2026-08-24.jpg
+        required: false
+        default: ''
+        type: string
 
 permissions:
   contents: write
@@ -47,6 +52,7 @@ jobs:
           IMPORT_DRY_RUN: ${{ inputs.dry_run }}
           IMPORT_REPORT_PATH: ${{ runner.temp }}/menu-import-report.json
           IMPORT_BENCHMARK_MENU: ${{ inputs.benchmark_reference }}
+          IMPORT_BENCHMARK_IMAGE: ${{ inputs.benchmark_image_path }}
         run: npm run import:facebook
       - name: Upload dry-run report
         if: ${{ always() && inputs.dry_run }}

@@ -11,7 +11,10 @@ const importer = createMenuImporter({
 
 const mode = process.argv[2]
 if (mode === 'facebook') {
-  await importer.runFacebook(process.env.IMPORT_BENCHMARK_MENU)
+  await importer.runFacebook(
+    process.env.IMPORT_BENCHMARK_MENU,
+    process.env.IMPORT_BENCHMARK_IMAGE,
+  )
 } else if (mode === 'manual') {
   await importer.runManual(process.argv[3])
 } else {

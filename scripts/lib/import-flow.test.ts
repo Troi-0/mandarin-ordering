@@ -62,6 +62,32 @@ afterEach(async () => {
 })
 
 describe('menu import orchestration', () => {
+  it.each([
+    {
+      date: '2026-08-24',
+      postId: '1697831445682461',
+      sha256: '2bfc03e5b38d9635e78e6be79da5ef879e48fff894a3ea508017b7e7da007867',
+    },
+    {
+      date: '2026-08-25',
+      postId: '1698896525575953',
+      sha256: '890ec67f6690203b6cc02de2cba695d062887f7f2c76f37d3526fffef511b532',
+    },
+  ])('pins the public $date benchmark image to its historical post', async ({
+    date,
+    postId,
+    sha256,
+  }) => {
+    const reference = menuSchema.parse(
+      JSON.parse(await readFile(`data/menus/${date}.json`, 'utf8')),
+    )
+    const image = await readFile(`test-fixtures/facebook/${date}.jpg`)
+
+    expect(reference.source.postId).toBe(postId)
+    expect(reference.validation.extractedBy).toMatch(/^human-verified/)
+    expect(imageSha256(image)).toBe(sha256)
+  })
+
   it('publishes approved Facebook data to identical current and archive menus', async () => {
     const transcript = await approvedTranscript()
     const fetchFacebook = vi.fn(async () => facebookResult())
@@ -343,6 +369,66 @@ describe('menu import orchestration', () => {
     }
     expect(report.benchmark).toEqual({ approved: true, uncertain: false, issues: [] })
     expect(compareTranscriptions(extracted, referenceTranscript(reference)).approved).toBe(true)
+  })
+
+  it('replays a repository Facebook fixture without contacting the live Page', async () => {
+    const reference = await humanMenu()
+    const transcript = referenceTranscript(reference)
+    await mkdir(path.join(testRoot, 'data/menus'), { recursive: true })
+    await mkdir(path.join(testRoot, 'test-fixtures/facebook'), { recursive: true })
+    await writeFile(
+      path.join(testRoot, 'data/menus/2026-08-24.json'),
+      JSON.stringify(reference),
+    )
+    await writeFile(path.join(testRoot, 'test-fixtures/facebook/2026-08-24.jpg'), IMAGE)
+    const reportPath = path.join(testRoot, 'fixture-report.json')
+    const fetchFacebook = vi.fn(async () => facebookResult())
+    const importer = createMenuImporter({
+      root: testRoot,
+      dryRun: true,
+      reportPath,
+      now: () => NOW,
+      fetchFacebook,
+      extract: async () => structuredClone(transcript),
+      verify: async () => structuredClone(transcript),
+    })
+
+    await expect(importer.runFacebook(
+      'data/menus/2026-08-24.json',
+      'test-fixtures/facebook/2026-08-24.jpg',
+    )).resolves.toBe('dry-run')
+    expect(fetchFacebook).not.toHaveBeenCalled()
+    expect(JSON.parse(await readFile(reportPath, 'utf8'))).toMatchObject({
+      status: 'approved',
+      menu: {
+        date: '2026-08-24',
+        source: { postId: reference.source.postId },
+      },
+      benchmark: { approved: true },
+    })
+  })
+
+  it('rejects unpaired or mismatched repository benchmark images', async () => {
+    const importer = createMenuImporter({ root: testRoot, dryRun: true, now: () => NOW })
+    await expect(importer.runFacebook(
+      undefined,
+      'test-fixtures/facebook/2026-08-24.jpg',
+    )).rejects.toThrow('requires IMPORT_BENCHMARK_MENU')
+
+    const reference = await humanMenu()
+    await mkdir(path.join(testRoot, 'data/menus'), { recursive: true })
+    await writeFile(
+      path.join(testRoot, 'data/menus/2026-08-24.json'),
+      JSON.stringify(reference),
+    )
+    await expect(importer.runFacebook(
+      'data/menus/2026-08-24.json',
+      'test-fixtures/facebook/2026-08-25.jpg',
+    )).rejects.toThrow('match the reference date')
+    await expect(importer.runFacebook(
+      'data/menus/2026-08-24.json',
+      '../2026-08-24.jpg',
+    )).rejects.toThrow('must be test-fixtures/facebook')
   })
 
   it('publishes a valid manual-inbox image with deterministic source metadata', async () => {
