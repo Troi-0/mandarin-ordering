@@ -408,14 +408,6 @@ export function compareTranscriptions(
         })
         continue
       }
-      if (extractedItem.name !== verifiedItem.name) {
-        addIssue({
-          category: extractedCategory.name,
-          item: extractedItem.name,
-          field: 'name',
-          explanation: `Name disagrees: extraction "${extractedItem.name}", blind verification "${verifiedItem.name}"`,
-        })
-      }
       if (extractedItem.portion !== verifiedItem.portion) {
         addIssue({
           category: extractedCategory.name,

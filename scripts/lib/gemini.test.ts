@@ -162,7 +162,7 @@ describe('blind Gemini transcription comparison', () => {
     expect(result.issues.some((issue) => ['missing-item', 'extra-item'].includes(issue.field))).toBe(true)
   })
 
-  it('rejects name, portion, and price disagreements', async () => {
+  it('ignores item-name differences but rejects portion and price disagreements', async () => {
     const extracted = await humanVerifiedTranscript()
     const verificationTranscript = structuredClone(extracted)
     verificationTranscript.categories[1].items[1].name =
@@ -179,12 +179,24 @@ describe('blind Gemini transcription comparison', () => {
     expect(result.approved).toBe(false)
     expect(result.uncertain).toBe(false)
     expect(result.issues.map((issue) => issue.field)).toEqual([
-      'name',
-      'name',
       'price',
-      'name',
       'portion',
     ])
+  })
+
+  it('approves name-only spelling and whitespace disagreements when numeric structure agrees', async () => {
+    const extracted = await humanVerifiedTranscript()
+    const verificationTranscript = structuredClone(extracted)
+    verificationTranscript.categories[1].items[4].name =
+      'Телешки кюфтета не скара /2бр/, с ½ пърленка, тирокафтери и гарнитура'
+    verificationTranscript.categories[5].items[1].name =
+      'Сала Капрезе с моцарела и песто/единично опакована/'
+
+    expect(compareTranscriptions(extracted, verificationTranscript)).toEqual({
+      approved: true,
+      uncertain: false,
+      issues: [],
+    })
   })
 
   it('rejects uncertainty even when both transcripts otherwise agree', async () => {

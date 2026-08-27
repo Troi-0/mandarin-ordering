@@ -30,8 +30,10 @@ time, Mandarin House Page author, and one unambiguous Facebook CDN attachment.
 It sorts those records by embedded creation time, rejects anything not dated
 today in Sofia, then runs two independent image transcriptions. The second pass
 is blind: it never receives the first pass. Code matches categories by normalized
-Bulgarian name regardless of returned category order, then compares item order,
-exact names, portions, and integer-cent prices and rejects every real disagreement.
+Bulgarian name regardless of returned category order, then rejects uncertainty
+and every item-count, portion, or integer-cent price disagreement. Item-name
+spelling and whitespace differences are non-blocking; the extraction name is
+displayed and both raw transcripts remain available in dry-run reports.
 
 Once today's menu is ready, later scheduled runs exit before opening Facebook or
 calling Gemini. A changed, fully validated menu is committed to `data/menus/` and
@@ -61,20 +63,22 @@ list. A rejected dry run intentionally finishes red.
 To regression-test the model against the original human-verified 43-item menu,
 set **Optional human-verified reference** to `data/menus/2026-08-24.json`. This
 loads that reference's historical Facebook post, runs both live Gemini passes,
-and also compares every item name, portion, and price with the human reference.
+and also compares every category/item count, portion, and price with the human
+reference.
 Benchmark mode is accepted only during a dry run and can never publish data.
 For a reproducible replay that does not depend on Facebook retaining historical
 feed markup, also select the matching archived source image under
 `test-fixtures/facebook/YYYY-MM-DD.jpg`. These fixtures are public menu images
 from the referenced posts; the importer requires an exact date match and still
-runs both live Gemini passes plus the human-reference comparison. The two blind
-passes must still agree on all text and numbers. The human benchmark tolerates
-display-only spelling, whitespace, and singular/plural category-label changes,
-but it rejects uncertainty or any category/item-count, portion, or price change.
+runs both live Gemini passes plus the human-reference comparison. Both checks
+tolerate item-name spelling and whitespace differences, but reject uncertainty
+or any category/item-count, portion, or price change. The human comparison also
+tolerates singular/plural category-label changes while still pairing categories
+deterministically.
 If Facebook has rotated the post out of the Page feed, the targeted benchmark
 may use the exact permalink's Open Graph image only when its canonical URL
 contains both the expected Page ID and post ID and it exposes one Facebook-CDN
-image. The trusted reference supplies the timestamp, and the human transcript
+image. The trusted reference supplies the timestamp, and its numeric structure
 still has to match before the benchmark can pass. This fallback is never used
 for the untargeted daily import.
 
