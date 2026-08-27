@@ -14,7 +14,8 @@
     "validate:cost": "tsx scripts/check-zero-cost.ts",
     "validate:menus": "tsx scripts/validate-menus.ts",
     "import:facebook": "tsx scripts/import-menu.ts facebook",
-    "import:manual": "tsx scripts/import-menu.ts manual"
+    "import:manual": "tsx scripts/import-menu.ts manual",
+    "reconcile:pages": "tsx scripts/reconcile-pages.ts"
   },
   "dependencies": {
     "react": "^19.2.8",

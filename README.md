@@ -21,14 +21,19 @@ build validation.
 ## Daily import
 
 - `npm run import:facebook` reads the latest public Page post with Playwright.
+- GitHub schedules four off-peak attempts per hour from 08:07 through 11:52
+  Sofia time because its scheduled events are best-effort and can be dropped.
 - `npm run import:manual -- manual-inbox/YYYY-MM-DD.png` processes a manually
   uploaded image.
 - Both commands require `GEMINI_API_KEY`. The Google AI project must remain on
   the free tier with billing disabled; there is no paid fallback.
 - Failed or uncertain extraction writes a draft under `data/review/` and never
   replaces the current menu.
-- A successful import explicitly requests a Pages deployment after pushing the
-  ready menu. Draft-only, dry-run, skipped, and unchanged imports do not deploy.
+- After every successful live import, including an already-ready or unchanged
+  menu, the workflow checks whether the exact current commit has a successful
+  Pages run. It requests a deployment when one is missing, so later schedules
+  recover from a failed dispatch or failed deployment. Draft-only and dry-run
+  imports never deploy.
 - A manually dispatched Facebook workflow defaults to **dry run**: it bypasses
   the already-ready shortcut, exercises Facebook and two blind Gemini
   transcriptions, compares them deterministically, uploads a short-lived report

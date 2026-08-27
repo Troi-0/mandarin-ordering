@@ -20,22 +20,29 @@ selections, or browser data.
 
 ## Daily behavior
 
-The scheduled workflow checks from 08:00 through 11:30 every 30 minutes in the
-`Europe/Sofia` timezone. It reads the newest Page-authored Facebook image post by
-its embedded creation timestamp, rejects anything not dated today in Sofia, then
-runs two independent image transcriptions. The second pass is blind: it never
-receives the first pass. Code matches categories by normalized Bulgarian name
-regardless of returned category order, then compares item order, exact names,
-portions, and integer-cent prices and rejects every real disagreement.
+The scheduled workflow checks at 08:07, 08:22, 08:37, and 08:52, repeating that
+staggered cadence through 11:52 in the `Europe/Sofia` timezone. These off-peak,
+15-minute attempts reduce the chance of GitHub dropping a scheduled event under
+load. It parses Facebook's embedded JSON and accepts an image
+only when the same structured post record directly owns the post ID, creation
+time, Mandarin House Page author, and one unambiguous Facebook CDN attachment.
+It sorts those records by embedded creation time, rejects anything not dated
+today in Sofia, then runs two independent image transcriptions. The second pass
+is blind: it never receives the first pass. Code matches categories by normalized
+Bulgarian name regardless of returned category order, then compares item order,
+exact names, portions, and integer-cent prices and rejects every real disagreement.
 
 Once today's menu is ready, later scheduled runs exit before opening Facebook or
 calling Gemini. A changed, fully validated menu is committed to `data/menus/` and
-`data/current-menu.json`. After that commit is pushed, the importer sends a
-`menu-published` repository dispatch so GitHub Pages builds the new default-branch
-commit. This explicit dispatch is required because GitHub does not start another
-push-triggered workflow for commits made with the workflow `GITHUB_TOKEN`.
-A rejected result may create `data/review/YYYY-MM-DD.json` for a collaborator to
-inspect, but it cannot become the current menu and does not request a deployment.
+`data/current-menu.json`. Every successful live run then reconciles publication:
+it checks for a successful Pages run on the exact checked-out commit and sends a
+`menu-published` repository dispatch when one is absent. Transient dispatch errors
+receive bounded retries; a later schedule retries again if the API call or Pages
+deployment still fails. This explicit dispatch is required because GitHub does
+not start another push-triggered workflow for commits made with the workflow
+`GITHUB_TOKEN`. A rejected result may create `data/review/YYYY-MM-DD.json` for a
+collaborator to inspect, but it cannot become the current menu and does not request
+a deployment.
 
 ## Safe live test
 
@@ -55,6 +62,10 @@ set **Optional human-verified reference** to `data/menus/2026-08-24.json`. This
 loads that reference's historical Facebook post, runs both live Gemini passes,
 and also compares every item name, portion, and price with the human reference.
 Benchmark mode is accepted only during a dry run and can never publish data.
+
+If today's menu is already ready but Pages needs a manual recovery attempt, run
+the same Facebook workflow with **dry run** unchecked. The importer will skip
+Facebook and Gemini, then reconcile the current commit with Pages.
 
 ## Manual fallback
 
@@ -80,5 +91,9 @@ the real menu test showed corrupted Bulgarian names and missed sections.
 - GitHub may disable scheduled workflows in a public repository after 60 days
   without repository activity. Re-enable the workflow from the Actions tab if
   needed.
+- GitHub documents scheduled Actions as best-effort: runs can be delayed or
+  dropped under load. The staggered redundant schedule reduces that risk, and
+  **workflow_dispatch** remains the free manual recovery if an entire morning is
+  missed.
 - If GitHub Pages, standard public-repository runners, or the Gemini free tier
   stops being free, disable the affected workflow. Do not add a metered fallback.

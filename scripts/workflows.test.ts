@@ -16,17 +16,20 @@ describe('GitHub workflow contracts', () => {
     expect(ci).not.toContain('GEMINI_API_KEY')
   })
 
-  it('keeps Facebook dry runs unpublished and deploys only a successful pushed import', async () => {
+  it('keeps Facebook dry runs unpublished and reconciles every successful live import', async () => {
     const importer = await workflow('import-facebook.yml')
 
     expect(importer).toContain('timezone: Europe/Sofia')
+    expect(importer).toContain("cron: '7,22,37,52 8-11 * * *'")
+    expect(importer).not.toContain("cron: '0,30 8-11 * * *'")
+    expect(importer).toContain('contents: write\n  actions: read')
     expect(importer).toContain('IMPORT_DRY_RUN: ${{ inputs.dry_run }}')
     expect(importer).toContain('menu-import-dry-run-${{ github.run_id }}')
     expect(importer).toContain("if: ${{ always() && !inputs.dry_run }}")
-    expect(importer).toContain(
-      "if: steps.importer.outcome == 'success' && steps.menu_commit.outputs.pushed == 'true'",
-    )
-    expect(importer).toContain('-f event_type=menu-published')
+    expect(importer).toContain("if: steps.importer.outcome == 'success' && !inputs.dry_run")
+    expect(importer).toContain('run: npm run reconcile:pages')
+    expect(importer).not.toContain('menu_commit.outputs.pushed')
+    expect(importer).not.toContain('gh api --method POST')
     expect(importer).toContain("if: steps.importer.outcome == 'failure'")
   })
 
@@ -34,12 +37,12 @@ describe('GitHub workflow contracts', () => {
     const importer = await workflow('import-manual.yml')
 
     expect(importer).toContain('manual-inbox/*.png')
+    expect(importer).toContain('contents: write\n  actions: read')
     expect(importer).toContain('GEMINI_API_KEY: ${{ secrets.GEMINI_API_KEY }}')
     expect(importer).toContain('run: npm run import:manual -- "${{ steps.image.outputs.path }}"')
-    expect(importer).toContain(
-      "if: steps.importer.outcome == 'success' && steps.menu_commit.outputs.pushed == 'true'",
-    )
-    expect(importer).toContain('-f event_type=menu-published')
+    expect(importer).toContain("if: steps.importer.outcome == 'success'")
+    expect(importer).toContain('run: npm run reconcile:pages')
+    expect(importer).not.toContain('menu_commit.outputs.pushed')
   })
 
   it('builds Pages from menu changes and from the bot repository dispatch', async () => {
