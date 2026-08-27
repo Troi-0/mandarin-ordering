@@ -92,7 +92,9 @@ export async function targetedPermalinkCandidate(
   }
   const postUrl = `https://www.facebook.com/permalink.php?story_fbid=${target.postId}&id=${PAGE_ID}`
   const response = await context.request.get(postUrl, {
-    headers: { referer: FACEBOOK_PAGE_URL },
+    // Facebook returns HTTP 400 to Playwright's API client user agent for this
+    // public endpoint, while the same anonymous request succeeds for browsers.
+    headers: { referer: FACEBOOK_PAGE_URL, 'user-agent': 'Mozilla/5.0' },
     timeout: 30_000,
   })
   if (!response.ok()) return undefined

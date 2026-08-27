@@ -225,7 +225,12 @@ describe('Facebook embedded post parsing', () => {
     })
     expect(get).toHaveBeenCalledWith(
       `https://www.facebook.com/permalink.php?story_fbid=${postId}&id=${PAGE_ID}`,
-      expect.objectContaining({ headers: { referer: expect.stringContaining(PAGE_ID) } }),
+      expect.objectContaining({
+        headers: {
+          referer: expect.stringContaining(PAGE_ID),
+          'user-agent': 'Mozilla/5.0',
+        },
+      }),
     )
   })
 
