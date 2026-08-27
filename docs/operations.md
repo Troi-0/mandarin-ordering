@@ -75,10 +75,16 @@ Facebook and Gemini, then reconcile the current commit with Pages.
    date filename, for example `2026-08-24.png`.
 3. The manual workflow runs the same extraction, verification, and deterministic
    validation. The API key stays inside Actions.
-4. If validation fails, correct the committed review draft with GitHub's editor.
-   Copy the corrected, complete `Menu` object to `data/menus/YYYY-MM-DD.json`,
-   wrap the same object as `{ "status": "ready", "menu": ... }` in
-   `data/current-menu.json`, and open a pull request. CI must pass before merging.
+4. If validation fails, open the committed review draft and correct its
+   `editableMenu` object with GitHub's editor. After checking every price against
+   the image, change `validation.extractedBy` to `human-corrected`,
+   `validation.verifiedBy` to `human-reviewed`, and
+   `validation.uncertain` to `false`.
+5. Copy that corrected `editableMenu` object to
+   `data/menus/YYYY-MM-DD.json`, wrap the same object as
+   `{ "status": "ready", "menu": ... }` in `data/current-menu.json`, and open
+   a pull request. CI must pass before merging. The untouched fail-closed draft
+   cannot pass the menu schema or be published accidentally.
 
 Never publish OCR-only text. Tesseract may help diagnose image readability, but
 the real menu test showed corrupted Bulgarian names and missed sections.

@@ -4,5 +4,6 @@ dist
 *.local
 playwright-report
 test-results
+coverage
 manual-inbox/*
 !manual-inbox/README.md
