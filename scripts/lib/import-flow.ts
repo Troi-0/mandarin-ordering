@@ -229,7 +229,12 @@ export function createMenuImporter(options: MenuImporterOptions) {
 
     const { candidate, image, mimeType } = await facebookFetcher(
       benchmarkReference
-        ? { postId: benchmarkReference.source.postId }
+        ? {
+            postId: benchmarkReference.source.postId,
+            creationTime: Math.floor(
+              new Date(benchmarkReference.source.publishedAt).getTime() / 1_000,
+            ),
+          }
         : undefined,
     )
     const publishedAt = new Date(candidate.creationTime * 1_000).toISOString()

@@ -1,6 +1,12 @@
-import { describe, expect, it } from 'vitest'
+import type { BrowserContext } from 'playwright'
+import { describe, expect, it, vi } from 'vitest'
 import { PAGE_ID } from '../../src/lib/menu-schema.ts'
-import { extractFacebookCandidatesFromJsonScripts, selectFacebookCandidate } from './facebook.ts'
+import {
+  extractFacebookCandidatesFromJsonScripts,
+  extractTargetedPermalinkImage,
+  selectFacebookCandidate,
+  targetedPermalinkCandidate,
+} from './facebook.ts'
 
 function photo(uri: string, id = 'photo-1') {
   return {
@@ -154,5 +160,90 @@ describe('Facebook embedded post parsing', () => {
 
     expect(selectFacebookCandidate(candidates, { postId: '111' })?.postId).toBe('111')
     expect(selectFacebookCandidate(candidates, { postId: '999' })).toBeUndefined()
+  })
+
+  it('accepts one exact-post Facebook CDN image from targeted permalink metadata', () => {
+    const html = `
+      <meta content="https://www.facebook.com/${PAGE_ID}/posts/menu/1698896525575953/" property="og:url">
+      <meta property="og:image" content="https://scontent.fsof9-1.fna.fbcdn.net/menu.jpg?a=1&amp;b=2">
+    `
+
+    expect(extractTargetedPermalinkImage(html, { postId: '1698896525575953' }))
+      .toBe('https://scontent.fsof9-1.fna.fbcdn.net/menu.jpg?a=1&b=2')
+  })
+
+  it('rejects cross-post, cross-page, non-CDN, ambiguous, and malformed permalink metadata', () => {
+    const validCanonical = `https://www.facebook.com/${PAGE_ID}/posts/menu/1698896525575953/`
+    const html = (canonical: string, images: string[]) => `
+      <meta property="og:url" content="${canonical}">
+      ${images.map((image) => `<meta property="og:image" content="${image}">`).join('\n')}
+    `
+    const target = { postId: '1698896525575953' }
+    const cdn = 'https://scontent.example.fbcdn.net/menu.jpg'
+
+    expect(extractTargetedPermalinkImage(
+      html(`https://www.facebook.com/${PAGE_ID}/posts/menu/111/`, [cdn]),
+      target,
+    )).toBeUndefined()
+    expect(extractTargetedPermalinkImage(
+      html('https://www.facebook.com/999999999/posts/menu/1698896525575953/', [cdn]),
+      target,
+    )).toBeUndefined()
+    expect(extractTargetedPermalinkImage(
+      html(validCanonical, ['https://example.com/menu.jpg']),
+      target,
+    )).toBeUndefined()
+    expect(extractTargetedPermalinkImage(
+      html(validCanonical, [cdn, 'https://scontent.example.fbcdn.net/other.jpg']),
+      target,
+    )).toBeUndefined()
+    expect(extractTargetedPermalinkImage('<meta property="og:url" content=broken>', target))
+      .toBeUndefined()
+  })
+
+  it('builds a targeted historical candidate only from a valid permalink response and trusted time', async () => {
+    const postId = '1698896525575953'
+    const imageUrl = 'https://scontent.example.fbcdn.net/menu.jpg?a=1&amp;b=2'
+    const response = {
+      ok: () => true,
+      text: async () => `
+        <meta property="og:url" content="https://www.facebook.com/${PAGE_ID}/posts/menu/${postId}/">
+        <meta property="og:image" content="${imageUrl}">
+      `,
+    }
+    const get = vi.fn(async () => response)
+    const context = { request: { get } } as unknown as BrowserContext
+
+    await expect(targetedPermalinkCandidate(context, {
+      postId,
+      creationTime: 1_777_000_000,
+    })).resolves.toEqual({
+      postId,
+      creationTime: 1_777_000_000,
+      imageUrl: 'https://scontent.example.fbcdn.net/menu.jpg?a=1&b=2',
+      postUrl: `https://www.facebook.com/permalink.php?story_fbid=${postId}&id=${PAGE_ID}`,
+    })
+    expect(get).toHaveBeenCalledWith(
+      `https://www.facebook.com/permalink.php?story_fbid=${postId}&id=${PAGE_ID}`,
+      expect.objectContaining({ headers: { referer: expect.stringContaining(PAGE_ID) } }),
+    )
+  })
+
+  it('fails targeted permalink lookup closed for untrusted time, HTTP failure, or invalid metadata', async () => {
+    const postId = '1698896525575953'
+    const context = (ok: boolean, html: string) => ({
+      request: { get: vi.fn(async () => ({ ok: () => ok, text: async () => html })) },
+    }) as unknown as BrowserContext
+
+    await expect(targetedPermalinkCandidate(context(true, ''), { postId }))
+      .resolves.toBeUndefined()
+    await expect(targetedPermalinkCandidate(context(false, ''), {
+      postId,
+      creationTime: 1_777_000_000,
+    })).resolves.toBeUndefined()
+    await expect(targetedPermalinkCandidate(context(true, '<html></html>'), {
+      postId,
+      creationTime: 1_777_000_000,
+    })).resolves.toBeUndefined()
   })
 })

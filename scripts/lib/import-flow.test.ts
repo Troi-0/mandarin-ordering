@@ -334,7 +334,10 @@ describe('menu import orchestration', () => {
     })
 
     await expect(importer.runFacebook('data/menus/2026-08-24.json')).resolves.toBe('dry-run')
-    expect(fetchFacebook).toHaveBeenCalledWith({ postId: reference.source.postId })
+    expect(fetchFacebook).toHaveBeenCalledWith({
+      postId: reference.source.postId,
+      creationTime: Math.floor(new Date(reference.source.publishedAt).getTime() / 1_000),
+    })
     const report = JSON.parse(await readFile(reportPath, 'utf8')) as {
       benchmark: { approved: boolean; issues: unknown[] }
     }

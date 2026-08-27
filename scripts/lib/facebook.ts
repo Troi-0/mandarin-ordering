@@ -1,4 +1,4 @@
-import { chromium } from 'playwright'
+import { chromium, type BrowserContext } from 'playwright'
 import { FACEBOOK_PAGE_URL, PAGE_ID } from '../../src/lib/menu-schema.ts'
 
 export interface FacebookStoryCandidate {
@@ -10,12 +10,100 @@ export interface FacebookStoryCandidate {
 
 export interface FacebookPostTarget {
   postId: string
+  creationTime?: number
 }
 
 type JsonRecord = Record<string, unknown>
 
 function isRecord(value: unknown): value is JsonRecord {
   return typeof value === 'object' && value !== null && !Array.isArray(value)
+}
+
+function decodeHtmlAttribute(value: string): string {
+  return value
+    .replace(/&amp;/giu, '&')
+    .replace(/&quot;/giu, '"')
+    .replace(/&#39;|&apos;/giu, "'")
+    .replace(/&#x([0-9a-f]+);/giu, (_, hex: string) => String.fromCodePoint(Number.parseInt(hex, 16)))
+    .replace(/&#([0-9]+);/gu, (_, decimal: string) => String.fromCodePoint(Number.parseInt(decimal, 10)))
+}
+
+function metaProperties(html: string): Map<string, Set<string>> {
+  const properties = new Map<string, Set<string>>()
+  for (const tag of html.match(/<meta\b[^>]*>/giu) ?? []) {
+    const attributes = new Map<string, string>()
+    const attributePattern = /([\w:.-]+)\s*=\s*(["'])(.*?)\2/gu
+    for (const match of tag.matchAll(attributePattern)) {
+      const [, name, , value] = match
+      if (name && value !== undefined) attributes.set(name.toLocaleLowerCase('en-US'), value)
+    }
+    const property = attributes.get('property')?.toLocaleLowerCase('en-US')
+    const content = attributes.get('content')
+    if (!property || content === undefined) continue
+    const values = properties.get(property) ?? new Set<string>()
+    values.add(decodeHtmlAttribute(content))
+    properties.set(property, values)
+  }
+  return properties
+}
+
+function hasExactFacebookPost(url: URL, target: FacebookPostTarget): boolean {
+  if (url.protocol !== 'https:') return false
+  if (!(url.hostname === 'facebook.com' || url.hostname.endsWith('.facebook.com'))) return false
+  const numericTokens: string[] = `${decodeURIComponent(url.pathname)}${url.search}`.match(/\d+/gu) ?? []
+  return numericTokens.includes(PAGE_ID) && numericTokens.includes(target.postId)
+}
+
+export function extractTargetedPermalinkImage(
+  html: string,
+  target: FacebookPostTarget,
+): string | undefined {
+  if (!/^\d+$/.test(target.postId)) return undefined
+  const properties = metaProperties(html)
+  const canonicalUrls = properties.get('og:url') ?? new Set<string>()
+  const imageUrls = properties.get('og:image') ?? new Set<string>()
+  if (canonicalUrls.size !== 1 || imageUrls.size !== 1) return undefined
+
+  try {
+    const [canonicalUrl] = canonicalUrls
+    const [imageUrl] = imageUrls
+    if (!canonicalUrl || !imageUrl || !hasExactFacebookPost(new URL(canonicalUrl), target)) {
+      return undefined
+    }
+    const parsedImage = new URL(imageUrl)
+    if (
+      parsedImage.protocol !== 'https:'
+      || !(parsedImage.hostname === 'fbcdn.net' || parsedImage.hostname.endsWith('.fbcdn.net'))
+    ) {
+      return undefined
+    }
+    return imageUrl
+  } catch {
+    return undefined
+  }
+}
+
+export async function targetedPermalinkCandidate(
+  context: BrowserContext,
+  target: FacebookPostTarget,
+): Promise<FacebookStoryCandidate | undefined> {
+  if (!Number.isSafeInteger(target.creationTime) || Number(target.creationTime) <= 0) {
+    return undefined
+  }
+  const postUrl = `https://www.facebook.com/permalink.php?story_fbid=${target.postId}&id=${PAGE_ID}`
+  const response = await context.request.get(postUrl, {
+    headers: { referer: FACEBOOK_PAGE_URL },
+    timeout: 30_000,
+  })
+  if (!response.ok()) return undefined
+  const imageUrl = extractTargetedPermalinkImage(await response.text(), target)
+  if (!imageUrl) return undefined
+  return {
+    postId: target.postId,
+    creationTime: Number(target.creationTime),
+    imageUrl,
+    postUrl,
+  }
 }
 
 function* recordsIn(value: unknown): Generator<JsonRecord> {
@@ -162,10 +250,16 @@ export async function fetchFacebookMenu(target?: FacebookPostTarget): Promise<{
       { timeout: 15_000 },
     ).catch(() => undefined)
     const jsonScripts = await page.locator('script[type="application/json"]').allTextContents()
-    const candidate = selectFacebookCandidate(
+    let candidate = selectFacebookCandidate(
       extractFacebookCandidatesFromJsonScripts(jsonScripts),
       target,
     )
+    // Explicitly targeted historical benchmarks are dry-run only. Facebook's
+    // feed rotates older records out, so use same-document Open Graph metadata
+    // from the exact permalink when a trusted reference supplies the timestamp.
+    if (!candidate && target) {
+      candidate = await targetedPermalinkCandidate(context, target)
+    }
     if (!candidate) {
       const pageTitle = (await page.title()).slice(0, 120)
       const serialized = jsonScripts.join('')

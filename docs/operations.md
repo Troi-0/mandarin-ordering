@@ -63,6 +63,12 @@ set **Optional human-verified reference** to `data/menus/2026-08-24.json`. This
 loads that reference's historical Facebook post, runs both live Gemini passes,
 and also compares every item name, portion, and price with the human reference.
 Benchmark mode is accepted only during a dry run and can never publish data.
+If Facebook has rotated the post out of the Page feed, the targeted benchmark
+may use the exact permalink's Open Graph image only when its canonical URL
+contains both the expected Page ID and post ID and it exposes one Facebook-CDN
+image. The trusted reference supplies the timestamp, and the human transcript
+still has to match before the benchmark can pass. This fallback is never used
+for the untargeted daily import.
 
 If today's menu is already ready but Pages needs a manual recovery attempt, run
 the same Facebook workflow with **dry run** unchecked. The importer will skip
@@ -88,6 +94,15 @@ Facebook and Gemini, then reconcile the current commit with Pages.
 
 Never publish OCR-only text. Tesseract may help diagnose image readability, but
 the real menu test showed corrupted Bulgarian names and missed sections.
+
+## Safe manual-image test
+
+The manually dispatched **Import manually uploaded menu** workflow defaults to
+**dry run**. It reads the selected `manual-inbox/YYYY-MM-DD.ext` image, performs
+both live Gemini transcriptions, compares them, validates the candidate, and
+uploads `manual-menu-dry-run-<run id>` for three days. It never commits menu
+data or reconciles Pages while dry run is selected. Push-triggered inbox uploads
+remain live imports, and unchecking dry run is an explicit publishing action.
 
 ## Failure and cost boundaries
 

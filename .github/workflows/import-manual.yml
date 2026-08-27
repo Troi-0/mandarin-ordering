@@ -14,6 +14,11 @@ on:
         description: Repository path such as manual-inbox/2026-08-24.png
         required: true
         type: string
+      dry_run:
+        description: Run Gemini and validation without publishing anything
+        required: true
+        default: true
+        type: boolean
 
 permissions:
   contents: write
@@ -57,9 +62,19 @@ jobs:
         continue-on-error: true
         env:
           GEMINI_API_KEY: ${{ secrets.GEMINI_API_KEY }}
+          IMPORT_DRY_RUN: ${{ github.event_name == 'workflow_dispatch' && inputs.dry_run }}
+          IMPORT_REPORT_PATH: ${{ runner.temp }}/menu-import-report.json
         run: npm run import:manual -- "${{ steps.image.outputs.path }}"
+      - name: Upload dry-run report
+        if: ${{ always() && github.event_name == 'workflow_dispatch' && inputs.dry_run }}
+        uses: actions/upload-artifact@v4
+        with:
+          name: manual-menu-dry-run-${{ github.run_id }}
+          path: ${{ runner.temp }}/menu-import-report.json
+          if-no-files-found: error
+          retention-days: 3
       - name: Commit changed menu or review draft
-        if: always()
+        if: ${{ always() && (github.event_name != 'workflow_dispatch' || !inputs.dry_run) }}
         run: |
           git config user.name "mandarin-menu-bot"
           git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
@@ -71,12 +86,18 @@ jobs:
             git push
           fi
       - name: Reconcile successfully published menu with Pages
-        if: steps.importer.outcome == 'success'
+        if: ${{ steps.importer.outcome == 'success' && (github.event_name != 'workflow_dispatch' || !inputs.dry_run) }}
         env:
           GH_TOKEN: ${{ github.token }}
         run: npm run reconcile:pages
       - name: Keep rejected extraction unpublished
         if: steps.importer.outcome == 'failure'
+        env:
+          DRY_RUN: ${{ github.event_name == 'workflow_dispatch' && inputs.dry_run }}
         run: |
-          echo "Import or verification failed. Any review draft was committed, but current-menu.json was not replaced."
+          if [ "$DRY_RUN" = "true" ]; then
+            echo "Dry run rejected. Check its report artifact; no repository data was changed."
+          else
+            echo "Import or verification failed. Any review draft was committed, but current-menu.json was not replaced."
+          fi
           exit 1
