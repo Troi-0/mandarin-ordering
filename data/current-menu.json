@@ -1,17 +1,17 @@
 {
   "status": "ready",
   "menu": {
-    "date": "2026-08-26",
+    "date": "2026-08-27",
     "restaurant": "Mandarin House",
     "currency": "EUR",
     "source": {
       "pageId": "100063668642218",
-      "postId": "1699875955478010",
-      "postUrl": "https://www.facebook.com/permalink.php?story_fbid=1699875955478010&id=100063668642218",
-      "publishedAt": "2026-08-26T05:30:01.000Z",
-      "imageSha256": "ff5c6ff97cb6a44d9119f27b4f90f3482281caf4e5e9c852146282643252044d"
+      "postId": "1700919125373693",
+      "postUrl": "https://www.facebook.com/permalink.php?story_fbid=1700919125373693&id=100063668642218",
+      "publishedAt": "2026-08-27T05:30:03.000Z",
+      "imageSha256": "457015045ce312bdaa5ca4306042a0b3c88fab8bbca3974bc7d1a0859334f5ac"
     },
-    "importedAt": "2026-08-26T06:42:39.341Z",
+    "importedAt": "2026-08-27T12:02:13.508Z",
     "importMethod": "facebook",
     "validation": {
       "extractedBy": "gemini-3.6-flash",
@@ -24,16 +24,16 @@
         "name": "СУПИ",
         "items": [
           {
-            "id": "item-e48f36f49572",
-            "name": "Телешко варено",
+            "id": "item-0b14aa8b903b",
+            "name": "Гулаш със свинско",
             "portion": "350 мл",
-            "priceCents": 300
+            "priceCents": 270
           },
           {
-            "id": "item-0003314fff19",
-            "name": "Боб чорба",
+            "id": "item-46e1afb03aa2",
+            "name": "Крем супа от тиквички със сирене",
             "portion": "350 мл",
-            "priceCents": 250
+            "priceCents": 270
           },
           {
             "id": "item-27bd3994ec83",
@@ -48,56 +48,56 @@
         "name": "ОСНОВНИ",
         "items": [
           {
-            "id": "item-f0fa495bf3a1",
-            "name": "Пълнено пилешко филе с чедър и моцарела, с гарнитура",
-            "portion": "350 г",
-            "priceCents": 530
-          },
-          {
-            "id": "item-bd108f92591c",
-            "name": "Пилешко филе Жулиен, с гарнитура /късчета от пил. филе с бекон, гъби и сметанов сос/",
+            "id": "item-fbe7609af877",
+            "name": "Панирано пилешко филе с корнфлейкс, с гарнитура",
             "portion": "350 г",
             "priceCents": 510
           },
           {
-            "id": "item-9e977dde7853",
-            "name": "Свинско джоланче с прясно зеле на фурна",
+            "id": "item-1a02fa2d46f7",
+            "name": "Късчета от пилешко с пушено сирене и сметана, с гарнитура",
             "portion": "350 г",
-            "priceCents": 490
+            "priceCents": 510
           },
           {
-            "id": "item-0bbefefac881",
-            "name": "Дърпано телешко с грейви сос и зеленчуци, гарнирано с ориз",
+            "id": "item-54eab6a6ccf4",
+            "name": "Порция свински гирос с ½ пърленка, тирокафтери и гарнитура",
             "portion": "350 г",
-            "priceCents": 630
+            "priceCents": 590
           },
           {
-            "id": "item-ad1126ec566b",
-            "name": "Лазаня Болонезе",
+            "id": "item-5d099b1d384b",
+            "name": "Агнешка дроб-сарма",
             "portion": "350 г",
             "priceCents": 460
           },
           {
-            "id": "item-3a9acd35cf1d",
-            "name": "Кашкавал пане, с гарнитура",
+            "id": "item-ec10be19edc4",
+            "name": "Мусака по Гръцки с патладжан",
+            "portion": "350 г",
+            "priceCents": 460
+          },
+          {
+            "id": "item-7ebf0c3b320b",
+            "name": "Пълнени чушки с кайма и ориз, с гарнитура",
             "portion": "350 г",
             "priceCents": 510
           },
           {
-            "id": "item-93e1e8e17958",
-            "name": "Яйца по панагюрски",
+            "id": "item-695e603cee70",
+            "name": "Руло от тиквички с филаделфия и пушена сьомга, с гарнитура",
+            "portion": "350 г",
+            "priceCents": 530
+          },
+          {
+            "id": "item-4672375bb102",
+            "name": "Орзо паста с горски гъби",
             "portion": "350 г",
             "priceCents": 410
           },
           {
-            "id": "item-32142c554aca",
-            "name": "Фузили с тиквички и сушени домати",
-            "portion": "350 г",
-            "priceCents": 430
-          },
-          {
-            "id": "item-28dccb59426e",
-            "name": "Филе от тилапия с пармезанова коричка, с гарнитура",
+            "id": "item-44d3ea083507",
+            "name": "Пържени филета от хек, с гарнитура",
             "portion": "350 г",
             "priceCents": 660
           }
@@ -192,32 +192,27 @@
         "name": "ДЕСЕРТ",
         "items": [
           {
-            "id": "item-92a3f5728b13",
-            "name": "Домашна бисквитена торта",
-            "priceCents": 290
+            "id": "item-588afab27bcf",
+            "name": "Бискофф торта",
+            "priceCents": 310
           },
           {
-            "id": "item-716dadb00599",
-            "name": "Тирамису в чашка",
-            "priceCents": 300
-          },
-          {
-            "id": "item-e11214ce099f",
+            "id": "item-f604b98a0896",
             "name": "Порция диня",
             "priceCents": 220
           },
           {
-            "id": "item-f66959cd3b27",
+            "id": "item-8f0b7d691665",
             "name": "Мляко с ориз и канела",
             "priceCents": 179
           },
           {
-            "id": "item-4883aa59c554",
+            "id": "item-f6862696c86d",
             "name": "Протеинов шоколадов мус",
             "priceCents": 290
           },
           {
-            "id": "item-60ad97fe75f4",
+            "id": "item-402baa5c0005",
             "name": "Млечен пудинг с чиа и плодове",
             "priceCents": 205
           }
