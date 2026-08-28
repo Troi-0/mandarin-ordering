@@ -1,0 +1,49 @@
+name: Recover missed daily menu import
+
+on:
+  schedule:
+    # UTC deliberately differs from the primary timezone-aware schedule. The
+    # runtime Sofia gate covers both summer (UTC+3) and winter (UTC+2) time.
+    - cron: '13,33,53 5-9 * * 1-5'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  actions: write
+
+concurrency:
+  group: menu-import-watchdog
+  cancel-in-progress: false
+
+jobs:
+  recover-if-stale:
+    runs-on: ubuntu-latest
+    timeout-minutes: 3
+    steps:
+      - uses: actions/checkout@v6
+        with:
+          persist-credentials: false
+      - uses: actions/setup-node@v6
+        with:
+          node-version: 24
+      - name: Check the current menu using Sofia time
+        id: freshness
+        env:
+          MENU_WATCHDOG_FORCE: ${{ github.event_name == 'workflow_dispatch' }}
+        run: node scripts/check-menu-freshness.ts
+      - name: Dispatch the production importer when stale
+        if: steps.freshness.outputs.needs_import == 'true'
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          for attempt in 1 2 3; do
+            if gh workflow run import-facebook.yml --ref master -f dry_run=false; then
+              echo "Requested production import for ${{ steps.freshness.outputs.sofia_date }}"
+              exit 0
+            fi
+            if [ "$attempt" -lt 3 ]; then
+              sleep $((attempt * 5))
+            fi
+          done
+          echo "Could not dispatch the production importer after 3 attempts" >&2
+          exit 1

@@ -24,6 +24,9 @@ build validation.
 - From Monday through Friday, GitHub schedules four off-peak attempts per hour
   from 08:07 through 11:52 Sofia time because its scheduled events are
   best-effort and can be dropped.
+- A separate UTC-scheduled watchdog checks the committed menu without Facebook,
+  Playwright, Gemini, or its API key. If today's plausible menu is missing during
+  the Sofia ordering window, it retries dispatching the production importer.
 - `npm run import:manual -- manual-inbox/YYYY-MM-DD.png` processes a manually
   uploaded image.
 - Both commands require `GEMINI_API_KEY`. The Google AI project must remain on

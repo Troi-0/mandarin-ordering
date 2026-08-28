@@ -162,7 +162,12 @@ describe('menu import orchestration', () => {
   })
 
   it('skips Facebook only when the complete current publication is valid and for today', async () => {
-    const existing = JSON.parse(await readFile('data/current-menu.json', 'utf8')) as unknown
+    const existing = {
+      status: 'ready',
+      menu: menuSchema.parse(
+        JSON.parse(await readFile(`data/menus/${TODAY}.json`, 'utf8')),
+      ),
+    }
     await mkdir(path.join(testRoot, 'data'), { recursive: true })
     await writeFile(path.join(testRoot, 'data/current-menu.json'), JSON.stringify(existing))
     const fetchFacebook = vi.fn(async () => facebookResult())

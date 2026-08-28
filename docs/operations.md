@@ -23,8 +23,13 @@ selections, or browser data.
 From Monday through Friday, the scheduled workflow checks at 08:07, 08:22,
 08:37, and 08:52, repeating that staggered cadence through 11:52 in the
 `Europe/Sofia` timezone. These off-peak, 15-minute attempts reduce the chance of
-GitHub dropping a scheduled event under load. It parses Facebook's embedded JSON
-and accepts an image
+GitHub dropping a scheduled event under load. A second workflow uses a separate
+UTC schedule at minutes 13, 33, and 53 from 05:00 through 09:59 UTC. It applies a
+runtime Sofia weekday/hour gate so daylight-saving changes remain correct. This
+watchdog only reads and sanity-checks `data/current-menu.json`; it has no Gemini
+key and does not install Playwright. When today's plausible menu is missing, it
+retries dispatching the production importer up to three times. The importer
+parses Facebook's embedded JSON and accepts an image
 only when the same structured post record directly owns the post ID, creation
 time, Mandarin House Page author, and one unambiguous Facebook CDN attachment.
 It sorts those records by embedded creation time, rejects anything not dated
@@ -129,8 +134,8 @@ remain live imports, and unchecking dry run is an explicit publishing action.
   without repository activity. Re-enable the workflow from the Actions tab if
   needed.
 - GitHub documents scheduled Actions as best-effort: runs can be delayed or
-  dropped under load. The staggered redundant schedule reduces that risk, and
-  **workflow_dispatch** remains the free manual recovery if an entire morning is
-  missed.
+  dropped under load. The primary Sofia schedule and independently defined UTC
+  watchdog reduce that risk, and **workflow_dispatch** remains the free manual
+  recovery if GitHub misses both workflows for an entire morning.
 - If GitHub Pages, standard public-repository runners, or the Gemini free tier
   stops being free, disable the affected workflow. Do not add a metered fallback.
