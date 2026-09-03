@@ -89,6 +89,24 @@ image. The trusted reference supplies the timestamp, and its numeric structure
 still has to match before the benchmark can pass. This fallback is never used
 for the untargeted daily import.
 
+### Free Gemini configuration benchmark
+
+The manually dispatched **Benchmark free Gemini menu OCR** workflow compares
+the production Gemini 3.6 control with the strongest free stable candidates on
+both archived human-verified menu images. It tests Gemini 3.7 with low thinking
+and high image resolution, plus Gemini 3.8 with low and medium thinking at both
+high and per-image ultra-high resolution. Candidate model IDs are exact and
+allowlisted; the benchmark has read-only repository permission, cannot publish
+menu data, and never changes the scheduled production configuration.
+
+The uploaded `gemini-benchmark-<run id>` report retains both raw transcripts,
+elapsed time, human-reference comparisons for both passes, the existing blind
+cross-check, and exact item-name differences. A configuration passes the safety
+gate only when both independent passes have no uncertainty and agree with each
+other and the human reference on every category/item count, portion, and price.
+Use the observed safety result first, then name accuracy and latency, before
+changing the pinned production configuration.
+
 If today's menu is already ready but Pages needs a manual recovery attempt, run
 the same Facebook workflow with **dry run** unchecked. The importer will skip
 Facebook and Gemini, then reconcile the current commit with Pages.

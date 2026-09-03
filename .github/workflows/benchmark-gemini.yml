@@ -1,0 +1,36 @@
+name: Benchmark free Gemini menu OCR
+
+on:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: gemini-menu-benchmark
+  cancel-in-progress: false
+
+jobs:
+  benchmark:
+    runs-on: ubuntu-latest
+    timeout-minutes: 45
+    steps:
+      - uses: actions/checkout@v6
+      - uses: actions/setup-node@v6
+        with:
+          node-version: 24
+          cache: npm
+      - run: npm ci
+      - name: Compare free stable Gemini configurations on human-verified images
+        env:
+          GEMINI_API_KEY: ${{ secrets.GEMINI_API_KEY }}
+          GEMINI_BENCHMARK_REPORT_PATH: ${{ runner.temp }}/gemini-benchmark-report.json
+        run: npm run benchmark:gemini
+      - name: Upload benchmark evidence
+        if: always()
+        uses: actions/upload-artifact@v7
+        with:
+          name: gemini-benchmark-${{ github.run_id }}
+          path: ${{ runner.temp }}/gemini-benchmark-report.json
+          if-no-files-found: error
+          retention-days: 7

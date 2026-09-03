@@ -51,6 +51,19 @@ describe('GitHub workflow contracts', () => {
     expect(importer).not.toContain('menu_commit.outputs.pushed')
   })
 
+  it('keeps model benchmarking manual, read-only, and artifact-backed', async () => {
+    const benchmark = await workflow('benchmark-gemini.yml')
+
+    expect(benchmark).toContain('workflow_dispatch:')
+    expect(benchmark).not.toContain('schedule:')
+    expect(benchmark).toContain('permissions:\n  contents: read')
+    expect(benchmark).toContain('GEMINI_API_KEY: ${{ secrets.GEMINI_API_KEY }}')
+    expect(benchmark).toContain('run: npm run benchmark:gemini')
+    expect(benchmark).toContain('if: always()')
+    expect(benchmark).toContain('gemini-benchmark-${{ github.run_id }}')
+    expect(benchmark).not.toContain('git push')
+  })
+
   it('independently recovers a missed primary schedule without running Gemini when fresh', async () => {
     const watchdog = await workflow('recover-missed-import.yml')
 

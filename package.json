@@ -14,6 +14,7 @@
     "test:watch": "vitest",
     "validate:cost": "tsx scripts/check-zero-cost.ts",
     "validate:menus": "tsx scripts/validate-menus.ts",
+    "benchmark:gemini": "tsx scripts/benchmark-gemini.ts",
     "import:facebook": "tsx scripts/import-menu.ts facebook",
     "import:manual": "tsx scripts/import-menu.ts manual",
     "reconcile:pages": "tsx scripts/reconcile-pages.ts"

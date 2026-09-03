@@ -1,7 +1,82 @@
 import { z } from 'zod'
 
-export const FREE_GEMINI_MODEL = 'gemini-3.6-flash'
-const API_URL = `https://generativelanguage.googleapis.com/v1beta/models/${FREE_GEMINI_MODEL}:generateContent`
+export const FREE_GEMINI_MODELS = [
+  'gemini-3.6-flash',
+  'gemini-3.7-flash',
+  'gemini-3.8-flash',
+] as const
+
+export type FreeGeminiModel = typeof FREE_GEMINI_MODELS[number]
+export type GeminiThinkingLevel = 'low' | 'medium'
+export type GeminiMediaResolution = 'high' | 'ultra-high'
+
+export interface GeminiConfig {
+  id: string
+  model: FreeGeminiModel
+  thinkingLevel?: GeminiThinkingLevel
+  mediaResolution?: GeminiMediaResolution
+  temperature?: 0
+}
+
+export const PRODUCTION_GEMINI_CONFIG: GeminiConfig = Object.freeze({
+  id: 'gemini-3.6-control',
+  model: 'gemini-3.6-flash',
+  temperature: 0,
+})
+
+export const GEMINI_BENCHMARK_CONFIGS: readonly GeminiConfig[] = Object.freeze([
+  PRODUCTION_GEMINI_CONFIG,
+  Object.freeze({
+    id: 'gemini-3.7-low-high',
+    model: 'gemini-3.7-flash',
+    thinkingLevel: 'low',
+    mediaResolution: 'high',
+  }),
+  Object.freeze({
+    id: 'gemini-3.8-low-high',
+    model: 'gemini-3.8-flash',
+    thinkingLevel: 'low',
+    mediaResolution: 'high',
+  }),
+  Object.freeze({
+    id: 'gemini-3.8-medium-high',
+    model: 'gemini-3.8-flash',
+    thinkingLevel: 'medium',
+    mediaResolution: 'high',
+  }),
+  Object.freeze({
+    id: 'gemini-3.8-low-ultra-high',
+    model: 'gemini-3.8-flash',
+    thinkingLevel: 'low',
+    mediaResolution: 'ultra-high',
+  }),
+  Object.freeze({
+    id: 'gemini-3.8-medium-ultra-high',
+    model: 'gemini-3.8-flash',
+    thinkingLevel: 'medium',
+    mediaResolution: 'ultra-high',
+  }),
+])
+
+export const FREE_GEMINI_MODEL = PRODUCTION_GEMINI_CONFIG.model
+
+export function assertFreeGeminiConfig(config: GeminiConfig): void {
+  if (!FREE_GEMINI_MODELS.includes(config.model)) {
+    throw new Error(`Gemini model is outside the free-only allowlist: ${config.model}`)
+  }
+  if (config.model === 'gemini-3.6-flash') {
+    if (config.thinkingLevel || config.mediaResolution || config.temperature !== 0) {
+      throw new Error('The Gemini 3.6 control must retain its legacy production request shape')
+    }
+    return
+  }
+  if (config.temperature !== undefined) {
+    throw new Error('Gemini 3.7 and 3.8 must not receive deprecated sampling parameters')
+  }
+  if (!config.thinkingLevel || !config.mediaResolution) {
+    throw new Error('Gemini 3.7 and 3.8 require explicit thinking and image-resolution settings')
+  }
+}
 
 export const extractedMenuSchema = z.object({
   uncertain: z.boolean(),
@@ -133,24 +208,40 @@ export async function generateJson(
   image: Uint8Array,
   mimeType: string,
   responseSchema: Record<string, unknown>,
+  config: GeminiConfig = PRODUCTION_GEMINI_CONFIG,
 ): Promise<unknown> {
+  assertFreeGeminiConfig(config)
+  const imagePart: Record<string, unknown> = {
+    inlineData: { mimeType, data: Buffer.from(image).toString('base64') },
+  }
+  if (config.mediaResolution === 'ultra-high') {
+    imagePart.mediaResolution = { level: 'MEDIA_RESOLUTION_ULTRA_HIGH' }
+  }
+  const generationConfig: Record<string, unknown> = {
+    responseMimeType: 'application/json',
+    responseSchema,
+  }
+  if (config.temperature !== undefined) generationConfig.temperature = config.temperature
+  if (config.thinkingLevel) {
+    generationConfig.thinkingConfig = { thinkingLevel: config.thinkingLevel }
+  }
+  if (config.mediaResolution === 'high') {
+    generationConfig.mediaResolution = 'MEDIA_RESOLUTION_HIGH'
+  }
   const requestBody = JSON.stringify({
     contents: [{
       parts: [
         { text: prompt },
-        { inlineData: { mimeType, data: Buffer.from(image).toString('base64') } },
+        imagePart,
       ],
     }],
-    generationConfig: {
-      responseMimeType: 'application/json',
-      responseSchema,
-      temperature: 0,
-    },
+    generationConfig,
   })
+  const apiUrl = `https://generativelanguage.googleapis.com/v1beta/models/${config.model}:generateContent`
   let response: Response | undefined
   for (let attempt = 0; attempt <= TRANSIENT_RETRY_DELAYS_MS.length; attempt += 1) {
     try {
-      response = await fetch(API_URL, {
+      response = await fetch(apiUrl, {
         method: 'POST',
         headers: {
           'content-type': 'application/json',
@@ -194,12 +285,17 @@ export async function generateJson(
   return JSON.parse(text)
 }
 
-export async function extractMenu(image: Uint8Array, mimeType: string): Promise<ExtractedMenu> {
+export async function extractMenu(
+  image: Uint8Array,
+  mimeType: string,
+  config: GeminiConfig = PRODUCTION_GEMINI_CONFIG,
+): Promise<ExtractedMenu> {
   const result = await generateJson(
     extractionPrompt,
     image,
     mimeType,
     extractionJsonSchema,
+    config,
   )
   return normalizeTranscription(extractedMenuSchema.parse(result))
 }
@@ -207,12 +303,14 @@ export async function extractMenu(image: Uint8Array, mimeType: string): Promise<
 export async function verifyMenu(
   image: Uint8Array,
   mimeType: string,
+  config: GeminiConfig = PRODUCTION_GEMINI_CONFIG,
 ): Promise<ExtractedMenu> {
   const result = await generateJson(
     blindVerificationPrompt,
     image,
     mimeType,
     extractionJsonSchema,
+    config,
   )
   return normalizeTranscription(extractedMenuSchema.parse(result))
 }

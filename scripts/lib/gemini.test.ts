@@ -2,9 +2,11 @@ import { readFile } from 'node:fs/promises'
 import { afterEach, describe, expect, it, vi } from 'vitest'
 import { menuSchema } from '../../src/lib/menu-schema.ts'
 import {
+  assertFreeGeminiConfig,
   comparePriceBenchmark,
   compareTranscriptions,
   extractedMenuSchema,
+  GEMINI_BENCHMARK_CONFIGS,
   generateJson,
   normalizeTranscription,
   type ExtractedMenu,
@@ -107,6 +109,76 @@ describe('blind Gemini transcription comparison', () => {
     await expect(generateJson('read menu', new Uint8Array([1]), 'image/jpeg', {}))
       .rejects.toThrow('Free Gemini request failed (400)')
     expect(fetchMock).toHaveBeenCalledOnce()
+  })
+
+  it('sends explicit 3.8 thinking and high-resolution settings without deprecated sampling', async () => {
+    vi.stubEnv('GEMINI_API_KEY', 'test-key')
+    const fetchMock = vi.fn(async (
+      _input: string | URL | Request,
+      _init?: RequestInit,
+    ) => new Response(JSON.stringify({
+      candidates: [{ content: { parts: [{ text: '{"ok":true}' }] } }],
+    }), { status: 200 }))
+    vi.stubGlobal('fetch', fetchMock)
+    const config = GEMINI_BENCHMARK_CONFIGS.find(
+      (candidate) => candidate.id === 'gemini-3.8-medium-high',
+    )
+    if (!config) throw new Error('Expected 3.8 medium/high benchmark config')
+
+    await generateJson('read menu', new Uint8Array([1, 2]), 'image/jpeg', {}, config)
+
+    expect(String(fetchMock.mock.calls[0][0])).toContain('/gemini-3.8-flash:generateContent')
+    const request = JSON.parse(String(fetchMock.mock.calls[0][1]?.body))
+    expect(request.generationConfig).toMatchObject({
+      thinkingConfig: { thinkingLevel: 'medium' },
+      mediaResolution: 'MEDIA_RESOLUTION_HIGH',
+    })
+    expect(request.generationConfig).not.toHaveProperty('temperature')
+    expect(request.generationConfig).not.toHaveProperty('topP')
+    expect(request.generationConfig).not.toHaveProperty('topK')
+    expect(request.contents[0].parts[1]).not.toHaveProperty('mediaResolution')
+  })
+
+  it('places ultra-high media resolution on the image part', async () => {
+    vi.stubEnv('GEMINI_API_KEY', 'test-key')
+    const fetchMock = vi.fn(async (
+      _input: string | URL | Request,
+      _init?: RequestInit,
+    ) => new Response(JSON.stringify({
+      candidates: [{ content: { parts: [{ text: '{"ok":true}' }] } }],
+    }), { status: 200 }))
+    vi.stubGlobal('fetch', fetchMock)
+    const config = GEMINI_BENCHMARK_CONFIGS.find(
+      (candidate) => candidate.id === 'gemini-3.8-low-ultra-high',
+    )
+    if (!config) throw new Error('Expected 3.8 low/ultra-high benchmark config')
+
+    await generateJson('read menu', new Uint8Array([1]), 'image/jpeg', {}, config)
+
+    const request = JSON.parse(String(fetchMock.mock.calls[0][1]?.body))
+    expect(request.generationConfig).toMatchObject({
+      thinkingConfig: { thinkingLevel: 'low' },
+    })
+    expect(request.generationConfig).not.toHaveProperty('mediaResolution')
+    expect(request.contents[0].parts[1].mediaResolution).toEqual({
+      level: 'MEDIA_RESOLUTION_ULTRA_HIGH',
+    })
+  })
+
+  it('keeps every benchmark on an exact free-only model configuration', () => {
+    expect(GEMINI_BENCHMARK_CONFIGS.map((config) => config.id)).toHaveLength(6)
+    expect(new Set(GEMINI_BENCHMARK_CONFIGS.map((config) => config.id)).size).toBe(6)
+    for (const config of GEMINI_BENCHMARK_CONFIGS) {
+      expect(() => assertFreeGeminiConfig(config)).not.toThrow()
+      expect(config.model).not.toContain('latest')
+    }
+    expect(() => assertFreeGeminiConfig({
+      id: 'unsafe',
+      model: 'gemini-3.8-flash',
+      thinkingLevel: 'low',
+      mediaResolution: 'high',
+      temperature: 0,
+    })).toThrow('deprecated sampling parameters')
   })
 
   it('normalizes printed gram abbreviations before comparison and publication', async () => {
