@@ -64,7 +64,8 @@ const extractionJsonSchema = {
 }
 
 const MAX_VERIFICATION_ISSUES = 100
-const MAX_REQUEST_ATTEMPTS = 3
+const TRANSIENT_RETRY_DELAYS_MS = [5_000, 10_000, 20_000, 40_000, 60_000]
+const MAX_RETRY_AFTER_MS = 120_000
 const TRANSIENT_HTTP_STATUSES = new Set([408, 429, 500, 502, 503, 504])
 
 const extractionPrompt = [
@@ -105,6 +106,28 @@ function wait(delayMs: number): Promise<void> {
   return new Promise((resolve) => setTimeout(resolve, delayMs))
 }
 
+function retryAfterMs(response: Response): number | undefined {
+  const value = response.headers.get('retry-after')
+  if (!value) return undefined
+
+  const seconds = Number(value)
+  if (Number.isFinite(seconds) && seconds >= 0) {
+    return Math.min(Math.ceil(seconds * 1_000), MAX_RETRY_AFTER_MS)
+  }
+
+  const retryAt = Date.parse(value)
+  if (!Number.isFinite(retryAt)) return undefined
+  return Math.min(Math.max(0, retryAt - Date.now()), MAX_RETRY_AFTER_MS)
+}
+
+function transientDelayMs(response: Response | undefined, retryIndex: number): number {
+  const baseDelay = TRANSIENT_RETRY_DELAYS_MS[retryIndex]
+  // Spread identical scheduled jobs across the free service instead of making
+  // every client retry on the same exponential-backoff boundary.
+  const jitteredDelay = Math.round(baseDelay * (0.8 + (Math.random() * 0.4)))
+  return Math.max(jitteredDelay, response ? (retryAfterMs(response) ?? 0) : 0)
+}
+
 export async function generateJson(
   prompt: string,
   image: Uint8Array,
@@ -125,24 +148,38 @@ export async function generateJson(
     },
   })
   let response: Response | undefined
-  for (let attempt = 0; attempt < MAX_REQUEST_ATTEMPTS; attempt += 1) {
-    response = await fetch(API_URL, {
-      method: 'POST',
-      headers: {
-        'content-type': 'application/json',
-        'x-goog-api-key': apiKey(),
-      },
-      body: requestBody,
-      signal: AbortSignal.timeout(90_000),
-    })
+  for (let attempt = 0; attempt <= TRANSIENT_RETRY_DELAYS_MS.length; attempt += 1) {
+    try {
+      response = await fetch(API_URL, {
+        method: 'POST',
+        headers: {
+          'content-type': 'application/json',
+          'x-goog-api-key': apiKey(),
+        },
+        body: requestBody,
+        signal: AbortSignal.timeout(90_000),
+      })
+    } catch (error) {
+      if (attempt === TRANSIENT_RETRY_DELAYS_MS.length) {
+        throw new Error('Free Gemini request failed after transient network errors', {
+          cause: error,
+        })
+      }
+      const delayMs = transientDelayMs(undefined, attempt)
+      process.stdout.write(
+        `Free Gemini request hit a transient network error; retrying in ${delayMs} ms\n`,
+      )
+      await wait(delayMs)
+      continue
+    }
     if (response.ok) break
     const body = await response.text()
     const canRetry = TRANSIENT_HTTP_STATUSES.has(response.status)
-      && attempt < MAX_REQUEST_ATTEMPTS - 1
+      && attempt < TRANSIENT_RETRY_DELAYS_MS.length
     if (!canRetry) {
       throw new Error(`Free Gemini request failed (${response.status}): ${body.slice(0, 400)}`)
     }
-    const delayMs = 1_000 * (2 ** attempt)
+    const delayMs = transientDelayMs(response, attempt)
     process.stdout.write(
       `Free Gemini request returned transient ${response.status}; retrying in ${delayMs} ms\n`,
     )

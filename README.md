@@ -26,11 +26,14 @@ build validation.
   best-effort and can be dropped.
 - A separate UTC-scheduled watchdog checks the committed menu without Facebook,
   Playwright, Gemini, or its API key. If today's plausible menu is missing during
-  the Sofia ordering window, it retries dispatching the production importer.
+  its cron-defined Sofia ordering window, it retries dispatching the production
+  importer even when GitHub starts the watchdog late.
 - `npm run import:manual -- manual-inbox/YYYY-MM-DD.png` processes a manually
   uploaded image.
 - Both commands require `GEMINI_API_KEY`. The Google AI project must remain on
   the free tier with billing disabled; there is no paid fallback.
+- Transient Gemini and network failures use bounded exponential backoff with
+  jitter and `Retry-After` support before failing closed.
 - Failed or uncertain extraction writes a draft under `data/review/` and never
   replaces the current menu.
 - After every successful live import, including an already-ready or unchanged

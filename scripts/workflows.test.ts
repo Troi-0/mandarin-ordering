@@ -52,9 +52,10 @@ describe('GitHub workflow contracts', () => {
   it('independently recovers a missed primary schedule without running Gemini when fresh', async () => {
     const watchdog = await workflow('recover-missed-import.yml')
 
-    expect(watchdog).toContain("cron: '13,33,53 5-9 * * 1-5'")
+    expect(watchdog).toContain("cron: '13,33,53 6-9 * * 1-5'")
     expect(watchdog).not.toContain('timezone: Europe/Sofia')
     expect(watchdog).toContain('contents: read\n  actions: write')
+    expect(watchdog).toContain("MENU_WATCHDOG_FORCE: 'true'")
     expect(watchdog).toContain('run: node scripts/check-menu-freshness.ts')
     expect(watchdog).toContain("if: steps.freshness.outputs.needs_import == 'true'")
     expect(watchdog).toContain('gh workflow run import-facebook.yml --ref master -f dry_run=false')

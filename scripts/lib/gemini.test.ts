@@ -36,10 +36,14 @@ async function humanVerifiedTranscript(): Promise<ExtractedMenu> {
 }
 
 describe('blind Gemini transcription comparison', () => {
-  it('retries transient Gemini failures with bounded backoff and no model fallback', async () => {
+  it('retries a sustained transient Gemini outage with bounded backoff and no model fallback', async () => {
     vi.useFakeTimers()
     vi.stubEnv('GEMINI_API_KEY', 'test-key')
     const fetchMock = vi.fn()
+      .mockResolvedValueOnce(new Response('temporarily unavailable', { status: 503 }))
+      .mockResolvedValueOnce(new Response('temporarily unavailable', { status: 503 }))
+      .mockResolvedValueOnce(new Response('temporarily unavailable', { status: 503 }))
+      .mockResolvedValueOnce(new Response('temporarily unavailable', { status: 503 }))
       .mockResolvedValueOnce(new Response('temporarily unavailable', { status: 503 }))
       .mockResolvedValueOnce(new Response(JSON.stringify({
         candidates: [{ content: { parts: [{ text: '{"ok":true}' }] } }],
@@ -50,9 +54,49 @@ describe('blind Gemini transcription comparison', () => {
     await vi.runAllTimersAsync()
 
     await expect(result).resolves.toEqual({ ok: true })
-    expect(fetchMock).toHaveBeenCalledTimes(2)
+    expect(fetchMock).toHaveBeenCalledTimes(6)
     expect(fetchMock.mock.calls.every(([url]) => String(url).includes('gemini-3.6-flash')))
       .toBe(true)
+  })
+
+  it('honors Retry-After when it is longer than the exponential delay', async () => {
+    vi.useFakeTimers()
+    vi.stubEnv('GEMINI_API_KEY', 'test-key')
+    vi.spyOn(Math, 'random').mockReturnValue(0.5)
+    const fetchMock = vi.fn()
+      .mockResolvedValueOnce(new Response('busy', {
+        status: 503,
+        headers: { 'retry-after': '30' },
+      }))
+      .mockResolvedValueOnce(new Response(JSON.stringify({
+        candidates: [{ content: { parts: [{ text: '{"ok":true}' }] } }],
+      }), { status: 200 }))
+    vi.stubGlobal('fetch', fetchMock)
+
+    const result = generateJson('read menu', new Uint8Array([1]), 'image/jpeg', {})
+    await vi.advanceTimersByTimeAsync(29_999)
+    expect(fetchMock).toHaveBeenCalledOnce()
+    await vi.advanceTimersByTimeAsync(1)
+
+    await expect(result).resolves.toEqual({ ok: true })
+    expect(fetchMock).toHaveBeenCalledTimes(2)
+  })
+
+  it('retries transient network errors before succeeding', async () => {
+    vi.useFakeTimers()
+    vi.stubEnv('GEMINI_API_KEY', 'test-key')
+    const fetchMock = vi.fn()
+      .mockRejectedValueOnce(new TypeError('socket reset'))
+      .mockResolvedValueOnce(new Response(JSON.stringify({
+        candidates: [{ content: { parts: [{ text: '{"ok":true}' }] } }],
+      }), { status: 200 }))
+    vi.stubGlobal('fetch', fetchMock)
+
+    const result = generateJson('read menu', new Uint8Array([1]), 'image/jpeg', {})
+    await vi.runAllTimersAsync()
+
+    await expect(result).resolves.toEqual({ ok: true })
+    expect(fetchMock).toHaveBeenCalledTimes(2)
   })
 
   it('does not retry permanent Gemini client errors', async () => {

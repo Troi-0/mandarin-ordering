@@ -24,12 +24,14 @@ From Monday through Friday, the scheduled workflow checks at 08:07, 08:22,
 08:37, and 08:52, repeating that staggered cadence through 11:52 in the
 `Europe/Sofia` timezone. These off-peak, 15-minute attempts reduce the chance of
 GitHub dropping a scheduled event under load. A second workflow uses a separate
-UTC schedule at minutes 13, 33, and 53 from 05:00 through 09:59 UTC. It applies a
-runtime Sofia weekday/hour gate so daylight-saving changes remain correct. This
-watchdog only reads and sanity-checks `data/current-menu.json`; it has no Gemini
-key and does not install Playwright. When today's plausible menu is missing, it
-retries dispatching the production importer up to three times. The importer
-parses Facebook's embedded JSON and accepts an image
+UTC schedule at minutes 13, 33, and 53 from 06:00 through 09:59 UTC. This maps to
+09:13-12:53 in summer and 08:13-11:53 in winter. The cron itself defines the
+recovery window: a runner that GitHub starts late still checks today's Sofia date
+and can recover a stale menu instead of exiting successfully without dispatching.
+This watchdog only reads and sanity-checks `data/current-menu.json`; it has no
+Gemini key and does not install Playwright. When today's plausible menu is
+missing, it retries dispatching the production importer up to three times. The
+importer parses Facebook's embedded JSON and accepts an image
 only when the same structured post record directly owns the post ID, creation
 time, Mandarin House Page author, and one unambiguous Facebook CDN attachment.
 It sorts those records by embedded creation time, rejects anything not dated
@@ -125,8 +127,9 @@ remain live imports, and unchecking dry run is an explicit publishing action.
 
 - If Facebook markup changes, Gemini is unavailable, the free quota is exhausted,
   or extraction is uncertain, the workflow fails without replacing the menu.
-- Direct Gemini calls retry transient 408, 429, and 5xx responses at most twice
-  with short exponential backoff. They never switch models or paid service tiers;
+- Direct Gemini calls retry transient network failures plus 408, 429, and 5xx
+  responses at most five times with bounded exponential backoff, jitter, and
+  `Retry-After` support. They never switch models or paid service tiers;
   permanent errors and exhausted retries still fail closed.
 - The browser checks the Sofia date independently. A stale embedded menu renders
   an unavailable screen and cannot be selected or shared.

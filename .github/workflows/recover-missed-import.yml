@@ -2,9 +2,11 @@ name: Recover missed daily menu import
 
 on:
   schedule:
-    # UTC deliberately differs from the primary timezone-aware schedule. The
-    # runtime Sofia gate covers both summer (UTC+3) and winter (UTC+2) time.
-    - cron: '13,33,53 5-9 * * 1-5'
+    # UTC deliberately differs from the primary timezone-aware schedule. This
+    # is 09:13-12:53 in summer and 08:13-11:53 in winter. The cron defines the
+    # valid recovery window so a delayed runner still retries instead of
+    # silently discarding a stale menu based on its eventual start time.
+    - cron: '13,33,53 6-9 * * 1-5'
   workflow_dispatch:
 
 permissions:
@@ -29,7 +31,7 @@ jobs:
       - name: Check the current menu using Sofia time
         id: freshness
         env:
-          MENU_WATCHDOG_FORCE: ${{ github.event_name == 'workflow_dispatch' }}
+          MENU_WATCHDOG_FORCE: 'true'
         run: node scripts/check-menu-freshness.ts
       - name: Dispatch the production importer when stale
         if: steps.freshness.outputs.needs_import == 'true'
