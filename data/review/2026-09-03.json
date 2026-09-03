@@ -15,9 +15,9 @@
     "importedAt": "2026-09-03T12:47:19.172Z",
     "importMethod": "facebook",
     "validation": {
-      "extractedBy": "gemini-3.6-flash",
-      "verifiedBy": "human-review-required",
-      "uncertain": true
+      "extractedBy": "human-corrected",
+      "verifiedBy": "human-reviewed",
+      "uncertain": false
     },
     "categories": [
       {
@@ -237,7 +237,7 @@
           },
           {
             "id": "item-ce37f6a30162",
-            "name": "Сала Капрезе с моцарела и песто 300гр/единично опакована/",
+            "name": "Сала Капрезе с моцарела и песто /единично опакована/",
             "portion": "300 г",
             "priceCents": 450
           },
