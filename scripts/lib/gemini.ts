@@ -18,6 +18,11 @@ export interface GeminiConfig {
   temperature?: 0
 }
 
+export interface GeminiRequestPolicy {
+  retryDelaysMs?: readonly number[]
+  timeoutMs?: number
+}
+
 export const PRODUCTION_GEMINI_CONFIG: GeminiConfig = Object.freeze({
   id: 'gemini-3.6-control',
   model: 'gemini-3.6-flash',
@@ -195,8 +200,12 @@ function retryAfterMs(response: Response): number | undefined {
   return Math.min(Math.max(0, retryAt - Date.now()), MAX_RETRY_AFTER_MS)
 }
 
-function transientDelayMs(response: Response | undefined, retryIndex: number): number {
-  const baseDelay = TRANSIENT_RETRY_DELAYS_MS[retryIndex]
+function transientDelayMs(
+  response: Response | undefined,
+  retryIndex: number,
+  retryDelaysMs: readonly number[],
+): number {
+  const baseDelay = retryDelaysMs[retryIndex]
   // Spread identical scheduled jobs across the free service instead of making
   // every client retry on the same exponential-backoff boundary.
   const jitteredDelay = Math.round(baseDelay * (0.8 + (Math.random() * 0.4)))
@@ -209,8 +218,11 @@ export async function generateJson(
   mimeType: string,
   responseSchema: Record<string, unknown>,
   config: GeminiConfig = PRODUCTION_GEMINI_CONFIG,
+  policy: GeminiRequestPolicy = {},
 ): Promise<unknown> {
   assertFreeGeminiConfig(config)
+  const retryDelaysMs = policy.retryDelaysMs ?? TRANSIENT_RETRY_DELAYS_MS
+  const timeoutMs = policy.timeoutMs ?? 90_000
   const imagePart: Record<string, unknown> = {
     inlineData: { mimeType, data: Buffer.from(image).toString('base64') },
   }
@@ -239,7 +251,7 @@ export async function generateJson(
   })
   const apiUrl = `https://generativelanguage.googleapis.com/v1beta/models/${config.model}:generateContent`
   let response: Response | undefined
-  for (let attempt = 0; attempt <= TRANSIENT_RETRY_DELAYS_MS.length; attempt += 1) {
+  for (let attempt = 0; attempt <= retryDelaysMs.length; attempt += 1) {
     try {
       response = await fetch(apiUrl, {
         method: 'POST',
@@ -248,15 +260,15 @@ export async function generateJson(
           'x-goog-api-key': apiKey(),
         },
         body: requestBody,
-        signal: AbortSignal.timeout(90_000),
+        signal: AbortSignal.timeout(timeoutMs),
       })
     } catch (error) {
-      if (attempt === TRANSIENT_RETRY_DELAYS_MS.length) {
+      if (attempt === retryDelaysMs.length) {
         throw new Error('Free Gemini request failed after transient network errors', {
           cause: error,
         })
       }
-      const delayMs = transientDelayMs(undefined, attempt)
+      const delayMs = transientDelayMs(undefined, attempt, retryDelaysMs)
       process.stdout.write(
         `Free Gemini request hit a transient network error; retrying in ${delayMs} ms\n`,
       )
@@ -266,11 +278,11 @@ export async function generateJson(
     if (response.ok) break
     const body = await response.text()
     const canRetry = TRANSIENT_HTTP_STATUSES.has(response.status)
-      && attempt < TRANSIENT_RETRY_DELAYS_MS.length
+      && attempt < retryDelaysMs.length
     if (!canRetry) {
       throw new Error(`Free Gemini request failed (${response.status}): ${body.slice(0, 400)}`)
     }
-    const delayMs = transientDelayMs(response, attempt)
+    const delayMs = transientDelayMs(response, attempt, retryDelaysMs)
     process.stdout.write(
       `Free Gemini request returned transient ${response.status}; retrying in ${delayMs} ms\n`,
     )
@@ -289,6 +301,7 @@ export async function extractMenu(
   image: Uint8Array,
   mimeType: string,
   config: GeminiConfig = PRODUCTION_GEMINI_CONFIG,
+  policy: GeminiRequestPolicy = {},
 ): Promise<ExtractedMenu> {
   const result = await generateJson(
     extractionPrompt,
@@ -296,6 +309,7 @@ export async function extractMenu(
     mimeType,
     extractionJsonSchema,
     config,
+    policy,
   )
   return normalizeTranscription(extractedMenuSchema.parse(result))
 }
@@ -304,6 +318,7 @@ export async function verifyMenu(
   image: Uint8Array,
   mimeType: string,
   config: GeminiConfig = PRODUCTION_GEMINI_CONFIG,
+  policy: GeminiRequestPolicy = {},
 ): Promise<ExtractedMenu> {
   const result = await generateJson(
     blindVerificationPrompt,
@@ -311,6 +326,7 @@ export async function verifyMenu(
     mimeType,
     extractionJsonSchema,
     config,
+    policy,
   )
   return normalizeTranscription(extractedMenuSchema.parse(result))
 }

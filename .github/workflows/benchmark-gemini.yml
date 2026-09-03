@@ -2,6 +2,19 @@ name: Benchmark free Gemini menu OCR
 
 on:
   workflow_dispatch:
+    inputs:
+      configuration:
+        description: One exact free Gemini configuration to test on both fixtures
+        required: true
+        default: gemini-3.8-medium-high
+        type: choice
+        options:
+          - gemini-3.8-medium-high
+          - gemini-3.8-low-high
+          - gemini-3.8-medium-ultra-high
+          - gemini-3.8-low-ultra-high
+          - gemini-3.7-low-high
+          - gemini-3.6-control
 
 permissions:
   contents: read
@@ -24,13 +37,14 @@ jobs:
       - name: Compare free stable Gemini configurations on human-verified images
         env:
           GEMINI_API_KEY: ${{ secrets.GEMINI_API_KEY }}
+          GEMINI_BENCHMARK_CONFIG: ${{ inputs.configuration }}
           GEMINI_BENCHMARK_REPORT_PATH: ${{ runner.temp }}/gemini-benchmark-report.json
         run: npm run benchmark:gemini
       - name: Upload benchmark evidence
         if: always()
         uses: actions/upload-artifact@v7
         with:
-          name: gemini-benchmark-${{ github.run_id }}
+          name: gemini-benchmark-${{ inputs.configuration }}-${{ github.run_id }}
           path: ${{ runner.temp }}/gemini-benchmark-report.json
           if-no-files-found: error
           retention-days: 7

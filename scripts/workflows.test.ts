@@ -58,9 +58,10 @@ describe('GitHub workflow contracts', () => {
     expect(benchmark).not.toContain('schedule:')
     expect(benchmark).toContain('permissions:\n  contents: read')
     expect(benchmark).toContain('GEMINI_API_KEY: ${{ secrets.GEMINI_API_KEY }}')
+    expect(benchmark).toContain('GEMINI_BENCHMARK_CONFIG: ${{ inputs.configuration }}')
     expect(benchmark).toContain('run: npm run benchmark:gemini')
     expect(benchmark).toContain('if: always()')
-    expect(benchmark).toContain('gemini-benchmark-${{ github.run_id }}')
+    expect(benchmark).toContain('gemini-benchmark-${{ inputs.configuration }}-${{ github.run_id }}')
     expect(benchmark).not.toContain('git push')
   })
 

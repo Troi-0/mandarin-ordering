@@ -10,6 +10,7 @@ import {
   verifyMenu,
   type ExtractedMenu,
   type GeminiConfig,
+  type GeminiRequestPolicy,
   type Verification,
 } from './lib/gemini.ts'
 import { referenceTranscript } from './lib/import-flow.ts'
@@ -29,6 +30,19 @@ const fixtures = [
     reference: 'data/menus/2026-08-25.json',
   },
 ] as const
+const requestedConfigId = process.env.GEMINI_BENCHMARK_CONFIG?.trim()
+const configs = requestedConfigId
+  ? GEMINI_BENCHMARK_CONFIGS.filter((config) => config.id === requestedConfigId)
+  : GEMINI_BENCHMARK_CONFIGS
+if (configs.length === 0) {
+  throw new Error(`Unknown GEMINI_BENCHMARK_CONFIG: ${requestedConfigId}`)
+}
+// Benchmarks should expose availability problems without spending minutes on
+// each candidate. Production requests retain their five bounded retries.
+const benchmarkRequestPolicy: GeminiRequestPolicy = Object.freeze({
+  retryDelaysMs: [],
+  timeoutMs: 90_000,
+})
 
 interface PassResult {
   elapsedMs: number
@@ -131,7 +145,7 @@ async function writeReport(results: BenchmarkResult[], startedAt: string): Promi
     finishedAt: new Date().toISOString(),
     productionChanged: false,
     summary: {
-      expectedCases: GEMINI_BENCHMARK_CONFIGS.length * fixtures.length,
+      expectedCases: configs.length * fixtures.length,
       completedCases: completed,
       safeCases: safe,
       erroredCases: results.length - completed,
@@ -143,7 +157,7 @@ async function writeReport(results: BenchmarkResult[], startedAt: string): Promi
 const startedAt = new Date().toISOString()
 const results: BenchmarkResult[] = []
 
-for (const config of GEMINI_BENCHMARK_CONFIGS) {
+for (const config of configs) {
   for (const fixture of fixtures) {
     process.stdout.write(`Benchmarking ${config.id} on ${fixture.image}\n`)
     const image = await readFile(path.join(root, fixture.image))
@@ -151,8 +165,18 @@ for (const config of GEMINI_BENCHMARK_CONFIGS) {
       JSON.parse(await readFile(path.join(root, fixture.reference), 'utf8')),
     )
     const humanTranscript = referenceTranscript(reference)
-    const extraction = await runPass(() => extractMenu(image, 'image/jpeg', config))
-    const blindVerification = await runPass(() => verifyMenu(image, 'image/jpeg', config))
+    const extraction = await runPass(() => extractMenu(
+      image,
+      'image/jpeg',
+      config,
+      benchmarkRequestPolicy,
+    ))
+    const blindVerification = await runPass(() => verifyMenu(
+      image,
+      'image/jpeg',
+      config,
+      benchmarkRequestPolicy,
+    ))
     const result: BenchmarkResult = {
       config,
       fixture,

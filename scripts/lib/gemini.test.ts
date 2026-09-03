@@ -9,6 +9,7 @@ import {
   GEMINI_BENCHMARK_CONFIGS,
   generateJson,
   normalizeTranscription,
+  PRODUCTION_GEMINI_CONFIG,
   type ExtractedMenu,
 } from './gemini.ts'
 
@@ -108,6 +109,22 @@ describe('blind Gemini transcription comparison', () => {
 
     await expect(generateJson('read menu', new Uint8Array([1]), 'image/jpeg', {}))
       .rejects.toThrow('Free Gemini request failed (400)')
+    expect(fetchMock).toHaveBeenCalledOnce()
+  })
+
+  it('can fail fast in benchmarks without weakening production retry defaults', async () => {
+    vi.stubEnv('GEMINI_API_KEY', 'test-key')
+    const fetchMock = vi.fn(async () => new Response('temporarily unavailable', { status: 503 }))
+    vi.stubGlobal('fetch', fetchMock)
+
+    await expect(generateJson(
+      'read menu',
+      new Uint8Array([1]),
+      'image/jpeg',
+      {},
+      PRODUCTION_GEMINI_CONFIG,
+      { retryDelaysMs: [] },
+    )).rejects.toThrow('Free Gemini request failed (503)')
     expect(fetchMock).toHaveBeenCalledOnce()
   })
 

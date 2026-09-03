@@ -91,13 +91,16 @@ for the untargeted daily import.
 
 ### Free Gemini configuration benchmark
 
-The manually dispatched **Benchmark free Gemini menu OCR** workflow compares
-the production Gemini 3.6 control with the strongest free stable candidates on
-both archived human-verified menu images. It tests Gemini 3.7 with low thinking
-and high image resolution, plus Gemini 3.8 with low and medium thinking at both
-high and per-image ultra-high resolution. Candidate model IDs are exact and
-allowlisted; the benchmark has read-only repository permission, cannot publish
-menu data, and never changes the scheduled production configuration.
+The manually dispatched **Benchmark free Gemini menu OCR** workflow runs one
+selected configuration on both archived human-verified menu images. Its choices
+cover the production Gemini 3.6 control, Gemini 3.7 with low thinking and high
+image resolution, plus Gemini 3.8 with low and medium thinking at both high and
+per-image ultra-high resolution. Separate, short runs keep free-tier demand
+failures attributable to the exact candidate. Benchmark calls do not retry so
+availability problems are measured without blocking the full matrix; production
+calls retain five bounded retries. Candidate model IDs are exact and allowlisted;
+the workflow has read-only repository permission, cannot publish menu data, and
+never changes the scheduled production configuration.
 
 The uploaded `gemini-benchmark-<run id>` report retains both raw transcripts,
 elapsed time, human-reference comparisons for both passes, the existing blind
