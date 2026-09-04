@@ -54,6 +54,52 @@ not start another push-triggered workflow for commits made with the workflow
 collaborator to inspect, but it cannot become the current menu and does not request
 a deployment.
 
+## Independent external scheduler
+
+GitHub's two native schedules share one failure domain: if GitHub drops scheduled
+events before creating workflow runs, neither workflow can repair the other. The
+external fallback is the schedule-only Cloudflare Worker in
+`workers/menu-scheduler/`. It has no HTTP handler or public route and does not run
+on a maintainer's computer. Cloudflare invokes it every 15 minutes from 05:00
+through 11:59 UTC on weekdays; the Worker applies the `Europe/Sofia` timezone and
+only acts from 08:45 through 13:59 local time, so daylight-saving changes do not
+shift the recovery window.
+
+Each invocation reads the authoritative menu, current `master` commit, active
+import runs, and Pages runs. It does nothing when today's plausible menu is on a
+commit with a successful exact-commit Pages run, or while an import or Pages run
+is already active. Otherwise it uses `workflow_dispatch` to start the existing
+**Import today's Facebook menu** workflow. All Facebook, Gemini, validation,
+commit, and Pages work remains inside GitHub Actions.
+
+### One-time Cloudflare deployment
+
+1. Create a fine-grained GitHub personal access token owned by `Troi-0`, limited
+   to only the `mandarin-ordering` repository, with **Actions: Read and write**
+   and no additional repository permissions. This permission can dispatch any
+   workflow in this repository, so do not reuse a broader token.
+2. From a Cloudflare Workers Free account, deploy the Worker and its Cron Trigger:
+
+   ```sh
+   npx wrangler@4.129.0 deploy --config workers/menu-scheduler/wrangler.json
+   npx wrangler@4.129.0 secret put GITHUB_ACTIONS_TOKEN \
+     --config workers/menu-scheduler/wrangler.json
+   ```
+
+   Enter the token only at Wrangler's secret prompt. Never place it in a command,
+   `.env`, `.dev.vars`, GitHub variable, or tracked file. Cloudflare stores Worker
+   secrets encrypted and does not expose their value after creation.
+3. In **Cloudflare Dashboard → Workers & Pages → mandarin-ordering-scheduler →
+   Triggers**, confirm the Cron Trigger is `*/15 5-11 * * 1-5` and there is no
+   `workers.dev` route. Trigger a test event from the dashboard, then confirm its
+   log reports `ready` without dispatching when today's site is healthy.
+
+Deployment is an administrative action, not a persistent local process. The
+source, schedule, and secret name are versioned here; the secret value exists only
+in Cloudflare. Rotate the GitHub token before its expiry and immediately replace
+the Worker secret. If the external fallback is retired, delete the Worker and
+revoke the token together.
+
 ## Safe live test
 
 Run **Import today's Facebook menu** manually from the Actions tab and leave the
@@ -159,7 +205,8 @@ remain live imports, and unchecking dry run is an explicit publishing action.
   needed.
 - GitHub documents scheduled Actions as best-effort: runs can be delayed or
   dropped under load. The primary Sofia schedule and independently defined UTC
-  watchdog reduce that risk, and **workflow_dispatch** remains the free manual
-  recovery if GitHub misses both workflows for an entire morning.
+  watchdog reduce that risk. The external Cloudflare schedule is the independent
+  recovery path when GitHub misses both workflows; **workflow_dispatch** remains
+  the free manual fallback if both providers are unavailable.
 - If GitHub Pages, standard public-repository runners, or the Gemini free tier
   stops being free, disable the affected workflow. Do not add a metered fallback.

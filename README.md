@@ -28,6 +28,11 @@ build validation.
   Playwright, Gemini, or its API key. If today's plausible menu is missing during
   its cron-defined Sofia ordering window, it retries dispatching the production
   importer even when GitHub starts the watchdog late.
+- A schedule-only Cloudflare Worker provides an external free fallback. It
+  checks the authoritative menu, active import, and exact Pages deployment every
+  15 minutes during the Sofia lunch window, dispatching the importer only when
+  recovery is needed. Its repository-scoped GitHub token is stored as an
+  encrypted Worker secret; see [docs/operations.md](docs/operations.md).
 - `npm run import:manual -- manual-inbox/YYYY-MM-DD.png` processes a manually
   uploaded image.
 - Both commands require `GEMINI_API_KEY`. The Google AI project must remain on

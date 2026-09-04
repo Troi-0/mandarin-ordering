@@ -5,5 +5,8 @@ dist
 playwright-report
 test-results
 coverage
+.wrangler
+workers/**/.dev.vars*
+workers/**/.env*
 manual-inbox/*
 !manual-inbox/README.md

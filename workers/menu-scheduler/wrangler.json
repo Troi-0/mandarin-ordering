@@ -1,0 +1,16 @@
+{
+  "name": "mandarin-ordering-scheduler",
+  "main": "worker.ts",
+  "compatibility_date": "2026-09-04",
+  "workers_dev": false,
+  "triggers": {
+    "crons": ["*/15 5-11 * * 1-5"]
+  },
+  "observability": {
+    "enabled": true,
+    "logs": {
+      "enabled": true,
+      "head_sampling_rate": 1
+    }
+  }
+}
