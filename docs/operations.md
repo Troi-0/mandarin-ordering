@@ -90,7 +90,7 @@ commit, and Pages work remains inside GitHub Actions.
    `.env`, `.dev.vars`, GitHub variable, or tracked file. Cloudflare stores Worker
    secrets encrypted and does not expose their value after creation.
 3. In **Cloudflare Dashboard → Workers & Pages → mandarin-ordering-scheduler →
-   Triggers**, confirm the Cron Trigger is `*/15 5-11 * * 1-5` and there is no
+   Triggers**, confirm the Cron Trigger is `*/15 5-11 * * MON-FRI` and there is no
    `workers.dev` route. Trigger a test event from the dashboard, then confirm its
    log reports `ready` without dispatching when today's site is healthy.
 

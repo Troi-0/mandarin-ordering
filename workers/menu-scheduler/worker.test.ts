@@ -50,7 +50,7 @@ describe('Cloudflare menu scheduler', () => {
   it('has only a weekday Cron Trigger and no public workers.dev route', () => {
     expect(workerConfig).toMatchObject({
       workers_dev: false,
-      triggers: { crons: ['*/15 5-11 * * 1-5'] },
+      triggers: { crons: ['*/15 5-11 * * MON-FRI'] },
     })
     expect(workerConfig).not.toHaveProperty('routes')
   })
