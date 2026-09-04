@@ -65,8 +65,11 @@ through 11:59 UTC on weekdays; the Worker applies the `Europe/Sofia` timezone an
 only acts from 08:45 through 13:59 local time, so daylight-saving changes do not
 shift the recovery window.
 
-Each invocation reads the authoritative menu, current `master` commit, active
-import runs, and Pages runs. It does nothing when today's plausible menu is on a
+Each invocation reads the public `master` commit without authentication, then
+reads the authoritative menu at that immutable SHA. Active import and Pages runs
+are queried by each active status, so an older waiting run cannot be hidden behind
+recent completed runs. Successful Pages runs are queried for that exact SHA.
+It does nothing when today's plausible menu is on a
 commit with a successful exact-commit Pages run, or while an import or Pages run
 is already active. Otherwise it uses `workflow_dispatch` to start the existing
 **Import today's Facebook menu** workflow. All Facebook, Gemini, validation,
@@ -74,13 +77,20 @@ commit, and Pages work remains inside GitHub Actions.
 
 ### One-time Cloudflare deployment
 
-1. Create a fine-grained GitHub personal access token owned by `Troi-0`, limited
+1. Obtain the maintainer's immediate confirmation before creating a GitHub token
+   or submitting it to Cloudflare. Create a fine-grained personal access token owned by `Troi-0`, limited
    to only the `mandarin-ordering` repository, with **Actions: Read and write**
    and no additional repository permissions. This permission can dispatch any
-   workflow in this repository, so do not reuse a broader token.
-2. From a Cloudflare Workers Free account, deploy the Worker and its Cron Trigger:
+   workflow in this repository, so do not reuse a broader token. Use a 366-day
+   expiration if GitHub permits it, record the actual expiry, and rotate before it.
+   GitHub includes read-only Metadata automatically. No Contents permission is
+   needed because the public commit and raw menu requests carry no token.
+2. Sign into or create a **Workers Free** account; no domain or paid subscription
+   is required. Authenticate pinned Wrangler, validate the bundle, and deploy:
 
    ```sh
+   npx wrangler@4.129.0 login
+   npx wrangler@4.129.0 deploy --dry-run --config workers/menu-scheduler/wrangler.json
    npx wrangler@4.129.0 deploy --config workers/menu-scheduler/wrangler.json
    npx wrangler@4.129.0 secret put GITHUB_ACTIONS_TOKEN \
      --config workers/menu-scheduler/wrangler.json
@@ -89,16 +99,74 @@ commit, and Pages work remains inside GitHub Actions.
    Enter the token only at Wrangler's secret prompt. Never place it in a command,
    `.env`, `.dev.vars`, GitHub variable, or tracked file. Cloudflare stores Worker
    secrets encrypted and does not expose their value after creation.
-3. In **Cloudflare Dashboard → Workers & Pages → mandarin-ordering-scheduler →
-   Triggers**, confirm the Cron Trigger is `*/15 5-11 * * MON-FRI` and there is no
-   `workers.dev` route. Trigger a test event from the dashboard, then confirm its
-   log reports `ready` without dispatching when today's site is healthy.
+3. Confirm the deployed Worker is `mandarin-ordering-scheduler`, uses the Free
+   plan, has `workers_dev: false`, `preview_urls: false`, no custom/public routes,
+   and has observability/logs enabled with full sampling. Confirm the encrypted
+   secret name exists using `npx wrangler@4.129.0 secret list --config
+   workers/menu-scheduler/wrangler.json`; never retrieve its value.
+4. In **Cloudflare Dashboard → Workers & Pages → mandarin-ordering-scheduler →
+   Settings → Trigger Events**, confirm `*/15 5-11 * * MON-FRI`. Cron changes may
+   take up to 15 minutes to propagate. **View events** shows scheduled executions;
+   a new Worker's Past Cron Events display can lag by up to 30 minutes. Use
+   Workers Logs for the structured result and errors. Local scheduled tests and
+   a successful deploy do not prove the production Cron Trigger fired.
+5. Expected successful results are `outside-window`, `ready`, `import-active`,
+   `pages-active`, or `stale`/`pages-missing` with one returned GitHub run URL.
+   Follow any dispatched run through importer outcome, exact commit, Pages run,
+   and live site. Do not modify production menu data to force recovery.
+
+For a Saturday deployment on September 5, 2026, no production Cron event is due
+until Monday September 7 at 05:00 UTC (08:00 Sofia). The first three events should
+report `outside-window`; 05:45 UTC (08:45 Sofia) is the first eligible recovery
+check. In winter the first eligible event is 06:45 UTC. The last eligible event
+is 10:45 UTC in summer and 11:45 UTC in winter. Document deployed configuration
+separately from that still-pending weekday execution, and inspect Monday's events
+and logs. Do not install a local scheduler to perform this check.
+
+The dispatch contract uses `X-GitHub-Api-Version: 2026-03-10`, POST to
+`/repos/Troi-0/mandarin-ordering/actions/workflows/import-facebook.yml/dispatches`,
+and only `{"ref":"master","inputs":{"dry_run":"false"}}`. A successful response
+is HTTP 200 with `workflow_run_id`, `run_url`, and `html_url`; the removed
+`return_run_details` request field must not be sent. The Worker validates the
+returned run identity and logs its URL. Lookup, timeout, and dispatch errors
+reject the scheduled invocation visibly without logging upstream bodies or
+credential-bearing request details. Dispatch is not retried within an invocation:
+after an ambiguous response, the next Cron checks active runs first. The existing
+GitHub `menu-import` concurrency group prevents simultaneous import execution,
+although it cannot make the cross-provider check and dispatch atomic.
+
+Official references, checked September 5, 2026:
+- [GitHub dispatch contract](https://docs.github.com/en/rest/actions/workflows#create-a-workflow-dispatch-event)
+- [GitHub 2026-03-10 breaking changes](https://docs.github.com/en/rest/about-the-rest-api/breaking-changes)
+- [Public commit access and Contents permission](https://docs.github.com/en/rest/commits/commits#get-a-commit)
+- [Cloudflare Cron and event history](https://developers.cloudflare.com/workers/configuration/cron-triggers/)
+- [Preview URL configuration](https://developers.cloudflare.com/workers/versions-and-deployments/preview-urls/)
+- [Workers Free limits](https://developers.cloudflare.com/workers/platform/limits/)
 
 Deployment is an administrative action, not a persistent local process. The
 source, schedule, and secret name are versioned here; the secret value exists only
 in Cloudflare. Rotate the GitHub token before its expiry and immediately replace
 the Worker secret. If the external fallback is retired, delete the Worker and
 revoke the token together.
+
+This uses one Cron Trigger and 28 invocations per weekday, with at most 14
+subrequests per eligible invocation. Workers Free currently allows 100,000
+requests/day, 50 subrequests/invocation, and 10 ms CPU/invocation. Network waiting
+does not count as CPU, but actual deployed CPU must still be checked. Workers
+Logs on Free retains three days of logs. No paid resource binding is configured.
+The existing zero-cost check does not inspect Cloudflare billing or the Gemini
+project's billing account; verify those provider settings independently.
+
+The unauthenticated public commit lookup uses GitHub's 60 requests/hour/IP rate
+limit, potentially shared with other Cloudflare traffic; a rate limit fails
+visibly and the next Cron retries. Authenticated Actions calls use the token's
+higher rate limit. If shared-IP limits prove problematic, explicitly approve
+adding Contents: Read and authenticating the commit lookup. A GitHub App could
+replace expiring PATs with short-lived installation tokens, but adds app setup,
+private-key storage/rotation and token minting; it is not part of this PAT design.
+Token expiry/revocation, Cloudflare outages/free limits, GitHub API or runner
+outages, and Facebook/Gemini failures can still prevent recovery. Observability
+makes failures inspectable; it does not itself send a proactive alert.
 
 ## Safe live test
 

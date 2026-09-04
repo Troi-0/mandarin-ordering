@@ -5,6 +5,12 @@ const PAGES_WORKFLOW = 'deploy-pages.yml'
 const API_VERSION = '2026-03-10'
 const SOFIA_TIME_ZONE = 'Europe/Sofia'
 const ACTIVE_RUN_STATUSES = new Set(['queued', 'in_progress', 'waiting', 'pending', 'requested'])
+const REQUEST_TIMEOUT_MS = 15_000
+const SOFIA_FORMATTER = new Intl.DateTimeFormat('en-CA', {
+  timeZone: SOFIA_TIME_ZONE,
+  year: 'numeric', month: '2-digit', day: '2-digit',
+  hour: '2-digit', minute: '2-digit', hourCycle: 'h23', weekday: 'short',
+})
 
 interface Env {
   GITHUB_ACTIONS_TOKEN: string
@@ -47,16 +53,7 @@ export interface RecoveryDecision {
 }
 
 function sofiaClock(now: Date): { date: string; hour: number; minute: number; weekday: string } {
-  const parts = new Intl.DateTimeFormat('en-CA', {
-    timeZone: SOFIA_TIME_ZONE,
-    year: 'numeric',
-    month: '2-digit',
-    day: '2-digit',
-    hour: '2-digit',
-    minute: '2-digit',
-    hourCycle: 'h23',
-    weekday: 'short',
-  }).formatToParts(now)
+  const parts = SOFIA_FORMATTER.formatToParts(now)
   const values = Object.fromEntries(parts.map((part) => [part.type, part.value]))
 
   return {
@@ -67,8 +64,7 @@ function sofiaClock(now: Date): { date: string; hour: number; minute: number; we
   }
 }
 
-function isRecoveryWindow(now: Date): boolean {
-  const clock = sofiaClock(now)
+function isRecoveryWindow(clock: ReturnType<typeof sofiaClock>): boolean {
   const weekday = ['Mon', 'Tue', 'Wed', 'Thu', 'Fri'].includes(clock.weekday)
   const afterOpening = clock.hour > 8 || (clock.hour === 8 && clock.minute >= 45)
   return weekday && afterOpening && clock.hour <= 13
@@ -108,60 +104,88 @@ function hasActiveRun(runs: WorkflowRun[]): boolean {
 
 export function evaluateRecovery(inputs: RecoveryInputs): RecoveryDecision {
   const clock = sofiaClock(inputs.now)
-  if (!isRecoveryWindow(inputs.now)) {
+  if (!isRecoveryWindow(clock)) {
     return { dispatch: false, reason: 'outside-window', sofiaDate: clock.date }
   }
   if (hasActiveRun(inputs.importerRuns)) {
     return { dispatch: false, reason: 'import-active', sofiaDate: clock.date }
   }
-  if (!hasPlausibleReadyMenu(inputs.publication, clock.date)) {
-    return { dispatch: true, reason: 'stale', sofiaDate: clock.date }
-  }
   if (hasActiveRun(inputs.pagesRuns)) {
     return { dispatch: false, reason: 'pages-active', sofiaDate: clock.date }
   }
+  if (!hasPlausibleReadyMenu(inputs.publication, clock.date)) {
+    return { dispatch: true, reason: 'stale', sofiaDate: clock.date }
+  }
   if (inputs.pagesRuns.some((run) => (
-    run.head_sha === inputs.headSha && run.conclusion === 'success'
+    run.head_sha === inputs.headSha && run.status === 'completed' && run.conclusion === 'success'
   ))) {
     return { dispatch: false, reason: 'ready', sofiaDate: clock.date }
   }
   return { dispatch: true, reason: 'pages-missing', sofiaDate: clock.date }
 }
 
-function githubHeaders(token: string): Record<string, string> {
+function githubHeaders(token?: string): Record<string, string> {
   return {
     accept: 'application/vnd.github+json',
-    authorization: `Bearer ${token}`,
+    ...(token ? { authorization: `Bearer ${token}` } : {}),
     'content-type': 'application/json',
     'user-agent': 'mandarin-ordering-cloudflare-scheduler',
     'x-github-api-version': API_VERSION,
   }
 }
 
-async function responseError(action: string, response: Response): Promise<Error> {
-  const body = (await response.text()).trim().slice(0, 300)
-  return new Error(`GitHub ${action} failed with ${response.status}${body ? `: ${body}` : ''}`)
+function responseError(action: string, response: Response): Error {
+  // Do not log upstream bodies or request details: they could reflect a secret.
+  return new Error(`GitHub ${action} failed with ${response.status}`)
+}
+
+async function request(url: string, init: RequestInit, fetchImpl: typeof fetch): Promise<Response> {
+  try {
+    return await fetchImpl(url, { ...init, signal: AbortSignal.timeout(REQUEST_TIMEOUT_MS) })
+  } catch {
+    throw new Error('GitHub request failed or timed out')
+  }
+}
+
+async function readJson<T>(response: Response): Promise<T> {
+  try {
+    return await response.json() as T
+  } catch {
+    throw new Error('GitHub returned invalid JSON')
+  }
 }
 
 async function githubJson<T>(
   path: string,
-  token: string,
+  token: string | undefined,
   fetchImpl: typeof fetch,
 ): Promise<T> {
-  const response = await fetchImpl(`https://api.github.com${path}`, {
+  const response = await request(`https://api.github.com${path}`, {
     headers: githubHeaders(token),
-  })
-  if (!response.ok) throw await responseError('lookup', response)
-  return response.json() as Promise<T>
+  }, fetchImpl)
+  if (!response.ok) throw responseError('lookup', response)
+  return readJson<T>(response)
 }
 
 function workflowRuns(payload: WorkflowRunsResponse): WorkflowRun[] {
   if (!Array.isArray(payload.workflow_runs)) {
     throw new Error('GitHub returned an invalid workflow-runs response')
   }
-  return payload.workflow_runs.filter(
-    (run): run is Record<string, unknown> => typeof run === 'object' && run !== null,
-  )
+  if (!payload.workflow_runs.every((run) => (
+    run && typeof run === 'object' && typeof run.status === 'string'
+  ))) throw new Error('GitHub returned an invalid workflow run')
+  return payload.workflow_runs as WorkflowRun[]
+}
+
+async function activeWorkflowRuns(workflow: string, token: string, fetchImpl: typeof fetch) {
+  // Status-filtered queries cannot hide a waiting run behind newer completed runs.
+  const results = await Promise.all([...ACTIVE_RUN_STATUSES].map(async (status) => (
+    workflowRuns(await githubJson<WorkflowRunsResponse>(
+      `/repos/${REPOSITORY}/actions/workflows/${workflow}/runs?branch=${BRANCH}&status=${status}&per_page=1`,
+      token, fetchImpl,
+    ))
+  )))
+  return results.flat()
 }
 
 export async function checkAndRecover(
@@ -169,7 +193,7 @@ export async function checkAndRecover(
   token: string,
   fetchImpl: typeof fetch = fetch,
 ): Promise<RecoveryDecision & { runUrl?: string }> {
-  if (!token.trim()) throw new Error('GITHUB_ACTIONS_TOKEN is required')
+  if (typeof token !== 'string' || !token.trim()) throw new Error('GITHUB_ACTIONS_TOKEN is required')
 
   const earlyDecision = evaluateRecovery({
     publication: null,
@@ -182,40 +206,41 @@ export async function checkAndRecover(
 
   // Cloudflare Cron is UTC-only. Keep its configured range broad and gate with
   // Sofia civil time here so DST never moves the restaurant's recovery window.
-  const cacheKey = encodeURIComponent(String(now.getTime()))
-  const [menuResponse, commit, importerPayload, pagesPayload] = await Promise.all([
-    fetchImpl(
-      `https://raw.githubusercontent.com/${REPOSITORY}/${BRANCH}/data/current-menu.json?at=${cacheKey}`,
-      { headers: { 'cache-control': 'no-cache' } },
-    ),
-    githubJson<{ sha?: unknown }>(`/repos/${REPOSITORY}/commits/${BRANCH}`, token, fetchImpl),
-    githubJson<WorkflowRunsResponse>(
-      `/repos/${REPOSITORY}/actions/workflows/${IMPORT_WORKFLOW}/runs?branch=${BRANCH}&per_page=10`,
-      token,
-      fetchImpl,
-    ),
-    githubJson<WorkflowRunsResponse>(
-      `/repos/${REPOSITORY}/actions/workflows/${PAGES_WORKFLOW}/runs?branch=${BRANCH}&per_page=10`,
-      token,
-      fetchImpl,
-    ),
-  ])
-
-  if (!menuResponse.ok) throw await responseError('menu lookup', menuResponse)
+  // This public lookup deliberately has no Authorization header, so the PAT
+  // needs only Actions permissions. Pin the menu read to that immutable SHA.
+  const commit = await githubJson<{ sha?: unknown }>(
+    `/repos/${REPOSITORY}/commits/${BRANCH}?per_page=1`, undefined, fetchImpl,
+  )
   if (typeof commit.sha !== 'string' || !/^[a-f0-9]{40,64}$/i.test(commit.sha)) {
     throw new Error('GitHub returned an invalid master commit SHA')
   }
+  const [publication, importerRuns, pagesRuns, pagesPayload] = await Promise.all([
+    (async () => {
+      const response = await request(
+        `https://raw.githubusercontent.com/${REPOSITORY}/${commit.sha}/data/current-menu.json`,
+        { headers: { 'cache-control': 'no-cache' } }, fetchImpl,
+      )
+      if (!response.ok) throw responseError('menu lookup', response)
+      return readJson<unknown>(response)
+    })(),
+    activeWorkflowRuns(IMPORT_WORKFLOW, token, fetchImpl),
+    activeWorkflowRuns(PAGES_WORKFLOW, token, fetchImpl),
+    githubJson<WorkflowRunsResponse>(
+      `/repos/${REPOSITORY}/actions/workflows/${PAGES_WORKFLOW}/runs?branch=${BRANCH}&status=success&head_sha=${commit.sha}&per_page=1`,
+      token, fetchImpl,
+    ),
+  ])
 
   const decision = evaluateRecovery({
-    publication: await menuResponse.json() as unknown,
+    publication,
     headSha: commit.sha,
-    importerRuns: workflowRuns(importerPayload),
-    pagesRuns: workflowRuns(pagesPayload),
+    importerRuns,
+    pagesRuns: [...pagesRuns, ...workflowRuns(pagesPayload)],
     now,
   })
   if (!decision.dispatch) return decision
 
-  const dispatchResponse = await fetchImpl(
+  const dispatchResponse = await request(
     `https://api.github.com/repos/${REPOSITORY}/actions/workflows/${IMPORT_WORKFLOW}/dispatches`,
     {
       method: 'POST',
@@ -224,16 +249,20 @@ export async function checkAndRecover(
         ref: BRANCH,
         inputs: { dry_run: 'false' },
       }),
-    },
+    }, fetchImpl,
   )
   if (dispatchResponse.status !== 200) {
-    throw await responseError('workflow dispatch', dispatchResponse)
+    throw responseError('workflow dispatch', dispatchResponse)
   }
 
-  const details = await dispatchResponse.json() as { html_url?: unknown }
+  const details = await readJson<{ workflow_run_id?: unknown; html_url?: unknown }>(dispatchResponse)
+  if (!Number.isSafeInteger(details.workflow_run_id) || Number(details.workflow_run_id) <= 0
+    || details.html_url !== `https://github.com/${REPOSITORY}/actions/runs/${details.workflow_run_id}`) {
+    throw new Error('GitHub dispatch returned invalid workflow run details; check Actions before retrying')
+  }
   return {
     ...decision,
-    ...(typeof details.html_url === 'string' ? { runUrl: details.html_url } : {}),
+    runUrl: details.html_url as string,
   }
 }
 

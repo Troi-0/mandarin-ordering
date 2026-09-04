@@ -3,6 +3,7 @@
   "main": "worker.ts",
   "compatibility_date": "2026-09-04",
   "workers_dev": false,
+  "preview_urls": false,
   "triggers": {
     "crons": ["*/15 5-11 * * MON-FRI"]
   },
