@@ -142,7 +142,6 @@ describe('Cloudflare menu scheduler', () => {
     expect(JSON.parse(String(init.body))).toEqual({
       ref: 'master',
       inputs: { dry_run: 'false' },
-      return_run_details: true,
     })
   })
 

@@ -223,15 +223,13 @@ export async function checkAndRecover(
       body: JSON.stringify({
         ref: BRANCH,
         inputs: { dry_run: 'false' },
-        return_run_details: true,
       }),
     },
   )
-  if (dispatchResponse.status !== 200 && dispatchResponse.status !== 204) {
+  if (dispatchResponse.status !== 200) {
     throw await responseError('workflow dispatch', dispatchResponse)
   }
 
-  if (dispatchResponse.status === 204) return decision
   const details = await dispatchResponse.json() as { html_url?: unknown }
   return {
     ...decision,
