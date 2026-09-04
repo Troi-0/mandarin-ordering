@@ -8,13 +8,13 @@ export interface MenuFreshnessDecision {
   sofiaDate: string
 }
 
-interface SofiaClock {
+export interface SofiaClock {
   date: string
   hour: number
   weekday: string
 }
 
-function sofiaClock(now: Date): SofiaClock {
+export function sofiaClock(now: Date): SofiaClock {
   const parts = new Intl.DateTimeFormat('en-CA', {
     timeZone: SOFIA_TIME_ZONE,
     year: 'numeric',

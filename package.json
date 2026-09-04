@@ -17,7 +17,9 @@
     "benchmark:gemini": "tsx scripts/benchmark-gemini.ts",
     "import:facebook": "tsx scripts/import-menu.ts facebook",
     "import:manual": "tsx scripts/import-menu.ts manual",
-    "reconcile:pages": "tsx scripts/reconcile-pages.ts"
+    "reconcile:pages": "tsx scripts/reconcile-pages.ts",
+    "watchdog:external": "node scripts/external-menu-watchdog.ts",
+    "watchdog:install": "node scripts/install-macos-watchdog.ts"
   },
   "dependencies": {
     "react": "^19.2.8",
