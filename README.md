@@ -28,11 +28,6 @@ build validation.
   Playwright, Gemini, or its API key. If today's plausible menu is missing during
   its cron-defined Sofia ordering window, it retries dispatching the production
   importer even when GitHub starts the watchdog late.
-- A macOS `launchd` watchdog provides a scheduler outside GitHub. Every 15
-  minutes it checks the authoritative `master` menu and exact Pages deployment,
-  then uses the existing authenticated `gh` client to dispatch a live import
-  only when recovery is needed. Install it with `npm run watchdog:install` on a
-  Mac that is normally logged in during the Sofia lunch window.
 - `npm run import:manual -- manual-inbox/YYYY-MM-DD.png` processes a manually
   uploaded image.
 - Both commands require `GEMINI_API_KEY`. The Google AI project must remain on

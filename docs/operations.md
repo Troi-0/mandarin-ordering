@@ -13,11 +13,6 @@ database, analytics, payment SDK, hosted font, or order-submission endpoint.
    `GEMINI_API_KEY`. Never add a paid fallback or attach billing to that project.
 3. Run **Deploy GitHub Pages** once from the Actions tab. After that, successful
    menu commits deploy automatically.
-4. On a Mac that is normally logged in during the Sofia lunch window, authenticate
-   the GitHub CLI for this repository and run `npm run watchdog:install`. This
-   installs `com.hristo.mandarin-ordering.watchdog` as a user LaunchAgent. It is
-   the independent scheduler fallback; it stores no new token and reuses the
-   existing `gh` credential.
 
 The only allowed model is `gemini-3.6-flash`. The importer sends only the
 already-public restaurant menu image to Gemini. It never receives visitor names,
@@ -36,18 +31,7 @@ and can recover a stale menu instead of exiting successfully without dispatching
 This watchdog only reads and sanity-checks `data/current-menu.json`; it has no
 Gemini key and does not install Playwright. When today's plausible menu is
 missing, it retries dispatching the production importer up to three times. The
-macOS LaunchAgent separately runs every 15 minutes and gates itself to weekdays
-from 08:00 through 13:59 in `Europe/Sofia`, regardless of the Mac's current time
-zone. It reads the authoritative menu, current branch SHA, importer runs, and
-Pages runs through GitHub's API. It dispatches `import-facebook.yml` with
-`dry_run=false` only when the menu is stale or the exact current commit lacks a
-successful Pages deployment, and it suppresses duplicate work while an importer
-or Pages deployment is active. Because this trigger originates outside GitHub's
-native `schedule` service, it still works when both repository cron workflows
-miss their events. The Mac and user session must be available for this fallback;
-a fully hosted timing SLA would require a separate external scheduler.
-
-The importer parses Facebook's embedded JSON and accepts an image
+importer parses Facebook's embedded JSON and accepts an image
 only when the same structured post record directly owns the post ID, creation
 time, Mandarin House Page author, and one unambiguous Facebook CDN attachment.
 It sorts those records by embedded creation time, rejects anything not dated
@@ -175,25 +159,7 @@ remain live imports, and unchecking dry run is an explicit publishing action.
   needed.
 - GitHub documents scheduled Actions as best-effort: runs can be delayed or
   dropped under load. The primary Sofia schedule and independently defined UTC
-  watchdog reduce that risk. The macOS LaunchAgent bypasses that shared scheduler
-  by calling **workflow_dispatch** through `gh`; manual dispatch remains the last
-  recovery path if the Mac is unavailable for the whole lunch window.
+  watchdog reduce that risk, and **workflow_dispatch** remains the free manual
+  recovery if GitHub misses both workflows for an entire morning.
 - If GitHub Pages, standard public-repository runners, or the Gemini free tier
   stops being free, disable the affected workflow. Do not add a metered fallback.
-
-## External watchdog diagnostics
-
-Run `npm run watchdog:external` for a safe one-off check. It exits without a
-dispatch outside the Sofia weekday window, while an import/deployment is active,
-or when today's menu and the exact current Pages commit are already ready.
-
-Inspect the installed service with:
-
-```bash
-launchctl print gui/$(id -u)/com.hristo.mandarin-ordering.watchdog
-tail -n 50 ~/Library/Logs/mandarin-ordering-watchdog.log
-tail -n 50 ~/Library/Logs/mandarin-ordering-watchdog.error.log
-```
-
-Re-run `npm run watchdog:install` after moving the repository or changing the
-Node installation path; the installer is idempotent and reloads the LaunchAgent.
