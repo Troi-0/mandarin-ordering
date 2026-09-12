@@ -224,7 +224,7 @@ export function createMenuImporter(options: MenuImporterOptions) {
   async function runFacebook(
     benchmarkPath?: string,
     benchmarkImagePath?: string,
-  ): Promise<'skipped' | 'published' | 'unchanged' | 'dry-run'> {
+  ): Promise<'skipped' | 'no-menu-post' | 'published' | 'unchanged' | 'dry-run'> {
     const benchmarkReference = await loadBenchmarkReference(benchmarkPath)
     const requestedBenchmarkImage = benchmarkImagePath?.trim()
     if (requestedBenchmarkImage) {
@@ -265,7 +265,7 @@ export function createMenuImporter(options: MenuImporterOptions) {
       return 'skipped'
     }
 
-    const { candidate, image, mimeType } = await facebookFetcher(
+    const result = await facebookFetcher(
       benchmarkReference
         ? {
             postId: benchmarkReference.source.postId,
@@ -275,14 +275,32 @@ export function createMenuImporter(options: MenuImporterOptions) {
           }
         : undefined,
     )
-    const publishedAt = new Date(candidate.creationTime * 1_000).toISOString()
+    if (result.status === 'no-menu-post') {
+      process.stdout.write(
+        `No Facebook menu post for ${sofiaDate(now())}; nothing was published (${result.detail})\n`,
+      )
+      return 'no-menu-post'
+    }
+
+    const { candidate, image, mimeType } = result
+    const candidateDate = sofiaDate(new Date(candidate.creationTime * 1_000))
+    // The newest Page image post being older than today is the same ordinary
+    // "no menu yet" case, not a broken importer. processImage still rejects a
+    // stale date, so this only decides whether the run is an alarm.
+    if (!benchmarkReference && candidateDate !== sofiaDate(now())) {
+      process.stdout.write(
+        `No Facebook menu post for ${sofiaDate(now())}; newest Page image post ${candidate.postId} is from ${candidateDate}\n`,
+      )
+      return 'no-menu-post'
+    }
+
     return processImage({
       image,
       mimeType,
-      date: sofiaDate(new Date(candidate.creationTime * 1_000)),
+      date: candidateDate,
       sourcePostId: candidate.postId,
       sourcePostUrl: candidate.postUrl,
-      publishedAt,
+      publishedAt: new Date(candidate.creationTime * 1_000).toISOString(),
       method: 'facebook',
       benchmarkReference,
     })

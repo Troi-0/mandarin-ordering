@@ -4,6 +4,7 @@ import { PAGE_ID } from '../../src/lib/menu-schema.ts'
 import {
   extractFacebookCandidatesFromJsonScripts,
   extractTargetedPermalinkImage,
+  inspectFacebookFeed,
   selectFacebookCandidate,
   targetedPermalinkCandidate,
 } from './facebook.ts'
@@ -151,6 +152,68 @@ describe('Facebook embedded post parsing', () => {
         }),
       ),
     ])).toEqual([])
+  })
+
+  it('separates a Page that posted no image from a feed this parser cannot read', () => {
+    const textOnly = { ...story('111', 100), attachments: [] }
+
+    expect(inspectFacebookFeed([feed(textOnly)])).toEqual({
+      candidates: [],
+      pageStories: 1,
+      unusableMediaStories: 0,
+    })
+    expect(inspectFacebookFeed(['{malformed'])).toEqual({
+      candidates: [],
+      pageStories: 0,
+      unusableMediaStories: 0,
+    })
+  })
+
+  it('flags a Page post whose attachment media holds an image it could not resolve', () => {
+    const renamedMediaField = {
+      ...story('111', 100),
+      attachments: [{
+        styles: {
+          attachment: {
+            media: { id: 'photo-1', full_image: { uri: 'https://scontent.example.fbcdn.net/111.jpg' } },
+          },
+        },
+      }],
+    }
+
+    expect(inspectFacebookFeed([feed(renamedMediaField)])).toMatchObject({
+      candidates: [],
+      pageStories: 1,
+      unusableMediaStories: 1,
+    })
+  })
+
+  it('flags a multi-photo post as unusable media rather than a Page that posted nothing', () => {
+    const twoPhotos = story('111', 100, {
+      images: [
+        'https://scontent.example.fbcdn.net/one.jpg',
+        'https://scontent.example.fbcdn.net/two.jpg',
+      ],
+    })
+
+    expect(inspectFacebookFeed([feed(twoPhotos)])).toMatchObject({
+      candidates: [],
+      pageStories: 1,
+      unusableMediaStories: 1,
+    })
+  })
+
+  it('counts conflicting duplicate records of one post as unusable media', () => {
+    const first = story('333', 300)
+    const conflicting = story('333', 300, {
+      images: ['https://scontent.example.fbcdn.net/different.jpg'],
+    })
+
+    expect(inspectFacebookFeed([feed(first), feed(conflicting)])).toMatchObject({
+      candidates: [],
+      pageStories: 1,
+      unusableMediaStories: 1,
+    })
   })
 
   it('selects an explicitly targeted historical post for a safe benchmark', () => {

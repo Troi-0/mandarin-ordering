@@ -74,8 +74,13 @@ jobs:
             git commit -m "data: update Sofia menu $(date -u +%F)"
             git push
           fi
+      - name: Report a weekday without a menu post
+        if: steps.importer.outputs.outcome == 'no-menu-post'
+        run: |
+          echo "The Page has no menu image post for today, so nothing was published." >> "$GITHUB_STEP_SUMMARY"
+          echo "This is the expected result on a closed or not-yet-posted day, not an import failure." >> "$GITHUB_STEP_SUMMARY"
       - name: Reconcile successfully published menu with Pages
-        if: steps.importer.outcome == 'success' && !inputs.dry_run
+        if: steps.importer.outcome == 'success' && !inputs.dry_run && steps.importer.outputs.outcome != 'no-menu-post'
         env:
           GH_TOKEN: ${{ github.token }}
         run: npm run reconcile:pages

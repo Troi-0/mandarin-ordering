@@ -28,7 +28,11 @@ describe('GitHub workflow contracts', () => {
     expect(importer).toContain('menu-import-dry-run-${{ github.run_id }}')
     expect(importer).toContain('uses: actions/upload-artifact@v7')
     expect(importer).toContain("if: ${{ always() && !inputs.dry_run }}")
-    expect(importer).toContain("if: steps.importer.outcome == 'success' && !inputs.dry_run")
+    expect(importer).toContain(
+      "if: steps.importer.outcome == 'success' && !inputs.dry_run && steps.importer.outputs.outcome != 'no-menu-post'",
+    )
+    expect(importer).toContain("if: steps.importer.outputs.outcome == 'no-menu-post'")
+    expect(importer).toContain('GITHUB_STEP_SUMMARY')
     expect(importer).toContain('run: npm run reconcile:pages')
     expect(importer).not.toContain('menu_commit.outputs.pushed')
     expect(importer).not.toContain('gh api --method POST')

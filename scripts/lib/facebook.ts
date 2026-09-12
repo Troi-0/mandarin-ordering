@@ -19,6 +19,24 @@ function isRecord(value: unknown): value is JsonRecord {
   return typeof value === 'object' && value !== null && !Array.isArray(value)
 }
 
+function isFacebookCdnUrl(value: string): boolean {
+  let parsed: URL
+  try {
+    parsed = new URL(value)
+  } catch {
+    return false
+  }
+  return parsed.protocol === 'https:'
+    && (parsed.hostname === 'fbcdn.net' || parsed.hostname.endsWith('.fbcdn.net'))
+}
+
+function containsFacebookCdnImage(value: unknown): boolean {
+  if (typeof value === 'string') return isFacebookCdnUrl(value)
+  if (Array.isArray(value)) return value.some(containsFacebookCdnImage)
+  if (!isRecord(value)) return false
+  return Object.values(value).some(containsFacebookCdnImage)
+}
+
 function decodeHtmlAttribute(value: string): string {
   return value
     .replace(/&amp;/giu, '&')
@@ -70,13 +88,7 @@ export function extractTargetedPermalinkImage(
     if (!canonicalUrl || !imageUrl || !hasExactFacebookPost(new URL(canonicalUrl), target)) {
       return undefined
     }
-    const parsedImage = new URL(imageUrl)
-    if (
-      parsedImage.protocol !== 'https:'
-      || !(parsedImage.hostname === 'fbcdn.net' || parsedImage.hostname.endsWith('.fbcdn.net'))
-    ) {
-      return undefined
-    }
+    if (!isFacebookCdnUrl(imageUrl)) return undefined
     return imageUrl
   } catch {
     return undefined
@@ -150,18 +162,7 @@ function directPhotoUrl(record: JsonRecord): string | undefined {
     const media = mediaFromAttachment(attachment)
     if (!media || !isRecord(media.photo_image) || typeof media.photo_image.uri !== 'string') continue
     const uri = media.photo_image.uri
-    let parsed: URL
-    try {
-      parsed = new URL(uri)
-    } catch {
-      continue
-    }
-    if (
-      parsed.protocol !== 'https:' ||
-      !(parsed.hostname === 'fbcdn.net' || parsed.hostname.endsWith('.fbcdn.net'))
-    ) {
-      continue
-    }
+    if (!isFacebookCdnUrl(uri)) continue
     photos.add(uri)
   }
 
@@ -187,11 +188,34 @@ function candidateFromRecord(record: JsonRecord): FacebookStoryCandidate | undef
   }
 }
 
-export function extractFacebookCandidatesFromJsonScripts(
-  jsonScripts: readonly string[],
-): FacebookStoryCandidate[] {
+function isPageStory(record: JsonRecord): boolean {
+  return typeof record.post_id === 'string'
+    && /^\d+$/.test(record.post_id)
+    && Number.isSafeInteger(record.creation_time)
+    && Number(record.creation_time) > 0
+    && directAuthorIds(record).includes(PAGE_ID)
+}
+
+function carriesUnusableMedia(record: JsonRecord): boolean {
+  if (!Array.isArray(record.attachments) || record.attachments.length === 0) return false
+  return record.attachments.some(
+    (attachment) => isRecord(attachment) && containsFacebookCdnImage(mediaFromAttachment(attachment)),
+  )
+}
+
+export interface FacebookFeedInspection {
+  candidates: FacebookStoryCandidate[]
+  /** Page-authored story records this parser understood, with or without an image. */
+  pageStories: number
+  /** Page stories whose attachment media holds an image this parser could not resolve to exactly one photo. */
+  unusableMediaStories: number
+}
+
+export function inspectFacebookFeed(jsonScripts: readonly string[]): FacebookFeedInspection {
   const candidates = new Map<string, FacebookStoryCandidate>()
   const ambiguousPostIds = new Set<string>()
+  const pageStoryIds = new Set<string>()
+  const unusableMediaIds = new Set<string>()
 
   for (const source of jsonScripts) {
     let parsed: unknown
@@ -202,6 +226,12 @@ export function extractFacebookCandidatesFromJsonScripts(
     }
 
     for (const record of recordsIn(parsed)) {
+      if (isPageStory(record)) {
+        const postId = record.post_id as string
+        pageStoryIds.add(postId)
+        if (!directPhotoUrl(record) && carriesUnusableMedia(record)) unusableMediaIds.add(postId)
+      }
+
       const candidate = candidateFromRecord(record)
       if (!candidate || ambiguousPostIds.has(candidate.postId)) continue
       const previous = candidates.get(candidate.postId)
@@ -219,7 +249,19 @@ export function extractFacebookCandidatesFromJsonScripts(
     }
   }
 
-  return [...candidates.values()].sort((a, b) => b.creationTime - a.creationTime)
+  for (const postId of ambiguousPostIds) unusableMediaIds.add(postId)
+
+  return {
+    candidates: [...candidates.values()].sort((a, b) => b.creationTime - a.creationTime),
+    pageStories: pageStoryIds.size,
+    unusableMediaStories: unusableMediaIds.size,
+  }
+}
+
+export function extractFacebookCandidatesFromJsonScripts(
+  jsonScripts: readonly string[],
+): FacebookStoryCandidate[] {
+  return inspectFacebookFeed(jsonScripts).candidates
 }
 
 export function selectFacebookCandidate(
@@ -230,11 +272,11 @@ export function selectFacebookCandidate(
   return candidates.find((candidate) => candidate.postId === target.postId)
 }
 
-export async function fetchFacebookMenu(target?: FacebookPostTarget): Promise<{
-  candidate: FacebookStoryCandidate
-  image: Uint8Array
-  mimeType: string
-}> {
+export type FacebookMenuResult =
+  | { status: 'ready'; candidate: FacebookStoryCandidate; image: Uint8Array; mimeType: string }
+  | { status: 'no-menu-post'; detail: string }
+
+export async function fetchFacebookMenu(target?: FacebookPostTarget): Promise<FacebookMenuResult> {
   const browser = await chromium.launch({ headless: true })
   try {
     const context = await browser.newContext({
@@ -253,10 +295,8 @@ export async function fetchFacebookMenu(target?: FacebookPostTarget): Promise<{
       { timeout: 15_000 },
     ).catch(() => undefined)
     const jsonScripts = await page.locator('script[type="application/json"]').allTextContents()
-    let candidate = selectFacebookCandidate(
-      extractFacebookCandidatesFromJsonScripts(jsonScripts),
-      target,
-    )
+    const inspection = inspectFacebookFeed(jsonScripts)
+    let candidate = selectFacebookCandidate(inspection.candidates, target)
     // Explicitly targeted historical benchmarks are dry-run only. Facebook's
     // feed rotates older records out, so use same-document Open Graph metadata
     // from the exact permalink when a trusted reference supplies the timestamp.
@@ -268,15 +308,27 @@ export async function fetchFacebookMenu(target?: FacebookPostTarget): Promise<{
       const serialized = jsonScripts.join('')
       const diagnostics = {
         jsonScripts: jsonScripts.length,
+        pageStories: inspection.pageStories,
+        unusableMediaStories: inspection.unusableMediaStories,
         postId: serialized.match(/post_id/g)?.length ?? 0,
         creationTime: serialized.match(/creation_time/g)?.length ?? 0,
         attachments: serialized.match(/attachments/g)?.length ?? 0,
         photoImage: serialized.match(/photo_image/g)?.length ?? 0,
         pageId: serialized.match(new RegExp(PAGE_ID, 'g'))?.length ?? 0,
       }
-      throw new Error(
-        `No unambiguous Page-authored image post was found in Facebook JSON (${serialized.length} bytes, title: ${pageTitle}, target: ${target?.postId ?? 'latest'}, signals: ${JSON.stringify(diagnostics)})`,
-      )
+      const evidence = `${serialized.length} bytes, title: ${pageTitle}, target: ${target?.postId ?? 'latest'}, signals: ${JSON.stringify(diagnostics)}`
+      // A Page that simply has not posted a menu today is the ordinary case and
+      // must not look like a broken importer. Only an unreadable feed, or a post
+      // whose media this parser can no longer resolve, is a real failure.
+      if (target || inspection.pageStories === 0 || inspection.unusableMediaStories > 0) {
+        throw new Error(
+          `No unambiguous Page-authored image post was found in Facebook JSON (${evidence})`,
+        )
+      }
+      return {
+        status: 'no-menu-post',
+        detail: `read ${inspection.pageStories} Page post(s), none carrying a menu image (${evidence})`,
+      }
     }
 
     const response = await context.request.get(candidate.imageUrl, {
@@ -288,7 +340,7 @@ export async function fetchFacebookMenu(target?: FacebookPostTarget): Promise<{
     if (!['image/jpeg', 'image/png', 'image/webp'].includes(contentType)) {
       throw new Error(`Unsupported Facebook image type: ${contentType}`)
     }
-    return { candidate, image: await response.body(), mimeType: contentType }
+    return { status: 'ready', candidate, image: await response.body(), mimeType: contentType }
   } finally {
     await browser.close()
   }

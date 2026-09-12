@@ -258,10 +258,35 @@ uploads `manual-menu-dry-run-<run id>` for three days. It never commits menu
 data or reconciles Pages while dry run is selected. Push-triggered inbox uploads
 remain live imports, and unchecking dry run is an explicit publishing action.
 
+## Days without a menu post
+
+A weekday with no menu is ordinary: the restaurant can be closed, on holiday, or
+simply late. The importer reports this as the successful outcome `no-menu-post`,
+writes nothing, skips Pages reconciliation, and records the reason in the run
+summary. Keeping those runs green is what makes a red run mean something.
+
+The outcome is chosen from what the feed actually contained:
+
+- Page-authored story records were read and none carries a menu image, or the
+  newest image post is not from today in Sofia: `no-menu-post`, run stays green.
+- No Page-authored story record was read at all: the feed is unreadable, so the
+  run fails. Facebook markup changes, blocks, and empty responses land here.
+- A Page post carries Facebook-CDN media that no longer resolves to exactly one
+  photo: the run fails. This is the guard against a silent shape change, and it
+  also covers an ambiguous multi-photo post.
+
+An explicitly targeted benchmark still fails when its post cannot be found;
+a dry run is an assertion that a specific post is readable.
+
+A long run of `no-menu-post` days is visible in the Actions list and on the live
+site, which keeps showing the unavailable screen. Confirm against the Page itself
+before assuming the importer is at fault.
+
 ## Failure and cost boundaries
 
-- If Facebook markup changes, Gemini is unavailable, the free quota is exhausted,
-  or extraction is uncertain, the workflow fails without replacing the menu.
+- If Facebook markup becomes unreadable, Gemini is unavailable, the free quota is
+  exhausted, or extraction is uncertain, the workflow fails without replacing the
+  menu.
 - Direct Gemini calls retry transient network failures plus 408, 429, and 5xx
   responses at most five times with bounded exponential backoff, jitter, and
   `Retry-After` support. They never switch models or paid service tiers;

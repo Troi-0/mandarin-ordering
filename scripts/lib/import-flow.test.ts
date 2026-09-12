@@ -31,6 +31,7 @@ async function approvedTranscript(): Promise<ExtractedMenu> {
 
 function facebookResult(timestamp = TODAY_TIMESTAMP, postId = '1700919125373693') {
   return {
+    status: 'ready' as const,
     candidate: {
       postId,
       creationTime: timestamp,
@@ -206,7 +207,7 @@ describe('menu import orchestration', () => {
     ).success).toBe(true)
   })
 
-  it('rejects a stale Facebook post before either Gemini pass', async () => {
+  it('treats a stale newest post as no menu today, without reaching Gemini or publishing', async () => {
     const extract = vi.fn(async () => approvedTranscript())
     const verify = vi.fn(async () => approvedTranscript())
     const importer = createMenuImporter({
@@ -220,12 +221,55 @@ describe('menu import orchestration', () => {
       verify,
     })
 
-    await expect(importer.runFacebook()).rejects.toThrow(
-      'Fail-closed date check: source is 2026-08-26, expected 2026-08-27',
-    )
+    await expect(importer.runFacebook()).resolves.toBe('no-menu-post')
     expect(extract).not.toHaveBeenCalled()
     expect(verify).not.toHaveBeenCalled()
     expect(await pathExists(path.join(testRoot, 'data/current-menu.json'))).toBe(false)
+  })
+
+  it('still fails closed inside processImage when a stale date reaches it directly', async () => {
+    const importer = createMenuImporter({
+      root: testRoot,
+      dryRun: false,
+      now: () => NOW,
+      extract: vi.fn(async () => approvedTranscript()),
+      verify: vi.fn(async () => approvedTranscript()),
+    })
+
+    await expect(importer.processImage({
+      image: IMAGE,
+      mimeType: 'image/jpeg',
+      date: '2026-08-26',
+      sourcePostId: '1700919125373693',
+      sourcePostUrl: facebookResult().candidate.postUrl,
+      publishedAt: '2026-08-26T05:30:03.000Z',
+      method: 'facebook',
+    })).rejects.toThrow('Fail-closed date check: source is 2026-08-26, expected 2026-08-27')
+    expect(await pathExists(path.join(testRoot, 'data/current-menu.json'))).toBe(false)
+  })
+
+  it('reports an image-less Page feed as no menu today instead of an import failure', async () => {
+    const extract = vi.fn(async () => approvedTranscript())
+    const verify = vi.fn(async () => approvedTranscript())
+    const fetchFacebook = vi.fn(async () => ({
+      status: 'no-menu-post' as const,
+      detail: 'read 1 Page post(s), none carrying a menu image',
+    }))
+    const importer = createMenuImporter({
+      root: testRoot,
+      dryRun: false,
+      now: () => NOW,
+      fetchFacebook,
+      extract,
+      verify,
+    })
+
+    await expect(importer.runFacebook()).resolves.toBe('no-menu-post')
+    expect(fetchFacebook).toHaveBeenCalledOnce()
+    expect(extract).not.toHaveBeenCalled()
+    expect(verify).not.toHaveBeenCalled()
+    expect(await pathExists(path.join(testRoot, 'data/current-menu.json'))).toBe(false)
+    expect(await pathExists(path.join(testRoot, 'data/review/2026-08-27.json'))).toBe(false)
   })
 
   it('writes a complete fail-closed review menu and never publishes a disagreement', async () => {

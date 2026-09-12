@@ -41,6 +41,8 @@ build validation.
   jitter and `Retry-After` support before failing closed.
 - Failed or uncertain extraction writes a draft under `data/review/` and never
   replaces the current menu.
+- A weekday without a menu post is an expected, successful no-op rather than a
+  failed run, so a red run keeps meaning that something needs a look.
 - After every successful live import, including an already-ready or unchanged
   menu, the workflow checks whether the exact current commit has a successful
   Pages run. It requests a deployment when one is missing, so later schedules
