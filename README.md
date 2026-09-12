@@ -43,6 +43,9 @@ build validation.
   replaces the current menu.
 - A weekday without a menu post is an expected, successful no-op rather than a
   failed run, so a red run keeps meaning that something needs a look.
+- The site itself explains the gap: a weekend rest day, a working morning still
+  waiting for the import, or, from 11:00 Sofia, a day with no published menu and
+  a link to the Facebook page.
 - After every successful live import, including an already-ready or unchanged
   menu, the workflow checks whether the exact current commit has a successful
   Pages run. It requests a deployment when one is missing, so later schedules

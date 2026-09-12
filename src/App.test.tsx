@@ -21,7 +21,9 @@ describe('interactive menu', () => {
     if (currentPublicationData.status !== 'ready') throw new Error('Expected a ready test publication')
     const [year, month, day] = nextWorkingSofiaDate(currentPublicationData.menu.date).split('-').map(Number)
     vi.useFakeTimers()
-    vi.setSystemTime(new Date(Date.UTC(year, month - 1, day, 12)))
+    // 06:00Z is a Sofia morning on that date, so this asserts the pending screen
+    // rather than the overdue one.
+    vi.setSystemTime(new Date(Date.UTC(year, month - 1, day, 6)))
 
     render(<App />)
 
@@ -44,6 +46,39 @@ describe('interactive menu', () => {
     expect(screen.getByText(nextService)).toBeInTheDocument()
     expect(screen.queryByRole('heading', { name: 'Днешното меню все още не е налично' })).not.toBeInTheDocument()
     expect(screen.queryByRole('button', { name: /Добави/ })).not.toBeInTheDocument()
+  })
+
+  it('waits quietly before the cutoff and names the Facebook page after it', () => {
+    // 2026-09-14 is the Monday the restaurant reopens; 07:00Z is 10:00 Sofia.
+    vi.useFakeTimers()
+    vi.setSystemTime(new Date('2026-09-14T07:00:00Z'))
+    const early = render(<App />)
+
+    expect(screen.getByRole('heading', { name: 'Днешното меню все още не е налично' })).toBeInTheDocument()
+    early.unmount()
+
+    vi.setSystemTime(new Date('2026-09-14T08:00:00Z'))
+    render(<App />)
+
+    expect(screen.getByRole('heading', { name: 'Все още няма меню за днес' })).toBeInTheDocument()
+    expect(screen.getByText(/може да е затворен или още да не е публикувал/)).toBeInTheDocument()
+    expect(screen.getByText('08:30')).toBeInTheDocument()
+    expect(screen.getByRole('link', { name: /Виж Facebook страницата/ })).toHaveAttribute(
+      'href',
+      'https://www.facebook.com/profile.php?id=100063668642218',
+    )
+    expect(screen.queryByRole('button', { name: /Добави/ })).not.toBeInTheDocument()
+  })
+
+  it('keeps the weekend closure ahead of the overdue cutoff', () => {
+    // Saturday 2026-09-12 at 15:00 Sofia is past the cutoff but still a rest day.
+    vi.useFakeTimers()
+    vi.setSystemTime(new Date('2026-09-12T12:00:00Z'))
+
+    render(<App />)
+
+    expect(screen.getByRole('heading', { name: 'Днес ресторантът почива' })).toBeInTheDocument()
+    expect(screen.queryByRole('heading', { name: 'Все още няма меню за днес' })).not.toBeInTheDocument()
   })
 
   it('renders menu categories, exact prices, the source link, and the informational disclaimer', () => {

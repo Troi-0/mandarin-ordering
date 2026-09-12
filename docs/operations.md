@@ -258,6 +258,24 @@ uploads `manual-menu-dry-run-<run id>` for three days. It never commits menu
 data or reconciles Pages while dry run is selected. Push-triggered inbox uploads
 remain live imports, and unchecking dry run is an explicit publishing action.
 
+## What visitors see without a menu
+
+The page never shows a menu from another day, so it explains the gap instead. It
+picks the explanation from the visitor's own Sofia clock, with no build, commit,
+or workflow run involved, which is what makes it work on days when the importer
+itself never ran:
+
+- Saturday and Sunday: the restaurant rest day, naming the next working day.
+- A working day before 11:00 Sofia: the menu is still expected.
+- A working day from 11:00 Sofia: no menu was published today, with the Facebook
+  Page linked so visitors can check for themselves.
+
+Every archived menu was posted at 08:30:0x Sofia by an automated Page post, so
+11:00 is roughly two and a half hours of margin. The wording deliberately does
+not blame the restaurant: the import pipeline has historically been the later of
+the two, and the page cannot tell the difference. Move
+`MENU_OVERDUE_SOFIA_HOUR` in `src/lib/date.ts` to change the cutoff.
+
 ## Days without a menu post
 
 A weekday with no menu is ordinary: the restaurant can be closed, on holiday, or

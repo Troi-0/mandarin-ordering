@@ -32,6 +32,26 @@ export function isTodayInSofia(date: string, now: Date = new Date()): boolean {
   return date === sofiaDate(now)
 }
 
+/**
+ * Every archived menu was posted at 08:30 Sofia. By this hour a working day
+ * without a menu is worth telling visitors about rather than still calling it
+ * "not yet".
+ */
+export const MENU_OVERDUE_SOFIA_HOUR = 11
+
+export function sofiaHour(input: Date = new Date()): number {
+  const [part] = new Intl.DateTimeFormat('en-CA', {
+    timeZone: SOFIA_TIME_ZONE,
+    hour: '2-digit',
+    hourCycle: 'h23',
+  }).formatToParts(input).filter((entry) => entry.type === 'hour')
+  return Number(part?.value)
+}
+
+export function isMenuOverdue(input: Date = new Date()): boolean {
+  return sofiaHour(input) >= MENU_OVERDUE_SOFIA_HOUR
+}
+
 export function isSofiaWeekend(date: string): boolean {
   return WEEKEND_DAYS.has(utcNoon(date).getUTCDay())
 }

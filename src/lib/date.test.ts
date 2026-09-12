@@ -1,8 +1,10 @@
 import { describe, expect, it } from 'vitest'
 import {
   formatBulgarianDate,
+  isMenuOverdue,
   isSofiaWeekend,
   isTodayInSofia,
+  MENU_OVERDUE_SOFIA_HOUR,
   nextWorkingSofiaDate,
   sofiaDate,
 } from './date.ts'
@@ -49,5 +51,25 @@ describe('Sofia working days', () => {
   it('crosses the autumn daylight-saving change and the year boundary', () => {
     expect(nextWorkingSofiaDate('2026-10-24')).toBe('2026-10-26')
     expect(nextWorkingSofiaDate('2026-12-31')).toBe('2027-01-01')
+  })
+})
+
+describe('menu overdue cutoff', () => {
+  it('turns over at the cutoff hour in Sofia, not UTC', () => {
+    expect(MENU_OVERDUE_SOFIA_HOUR).toBe(11)
+    // Summer: Sofia is UTC+3, so 10:59 local is 07:59Z and 11:00 local is 08:00Z.
+    expect(isMenuOverdue(new Date('2026-09-14T07:59:59Z'))).toBe(false)
+    expect(isMenuOverdue(new Date('2026-09-14T08:00:00Z'))).toBe(true)
+  })
+
+  it('keeps the same local cutoff after the autumn daylight-saving change', () => {
+    // Winter: Sofia is UTC+2, so the same local 11:00 is 09:00Z.
+    expect(isMenuOverdue(new Date('2026-11-16T08:59:59Z'))).toBe(false)
+    expect(isMenuOverdue(new Date('2026-11-16T09:00:00Z'))).toBe(true)
+  })
+
+  it('stays overdue for the rest of the day and resets after Sofia midnight', () => {
+    expect(isMenuOverdue(new Date('2026-09-14T20:30:00Z'))).toBe(true)
+    expect(isMenuOverdue(new Date('2026-09-14T21:30:00Z'))).toBe(false)
   })
 })

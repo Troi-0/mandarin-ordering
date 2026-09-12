@@ -2,6 +2,7 @@ import { useEffect, useMemo, useState } from 'react'
 import currentPublicationData from '../data/current-menu.json'
 import {
   formatBulgarianDate,
+  isMenuOverdue,
   isSofiaWeekend,
   isTodayInSofia,
   nextWorkingSofiaDate,
@@ -73,7 +74,7 @@ function FacebookLink() {
 
 function ClosedCutlery() {
   return (
-    <svg className="closed-art" viewBox="0 0 64 64" role="presentation" focusable="false">
+    <svg className="plate-art" viewBox="0 0 64 64" role="presentation" focusable="false">
       <g className="art-fork" transform="translate(-7 0) rotate(-22 32 32)">
         <path d="M24 9v13M32 9v13M40 9v13" />
         <path d="M24 22c0 5.5 3.5 8 8 8s8-2.5 8-8" />
@@ -98,9 +99,45 @@ function ClosedDay() {
         <p>
           В събота и неделя Mandarin House не предлага обедно меню, затова днес няма какво да покажем.
         </p>
-        <div className="next-service">
+        <div className="card-note">
           <span aria-hidden="true">→</span>
           Следващо меню: <strong>{formatBulgarianDate(nextWorkingSofiaDate(today))}</strong>
+        </div>
+        <FacebookLink />
+        <small>{DISCLAIMER}</small>
+      </section>
+    </main>
+  )
+}
+
+function OverdueClock() {
+  return (
+    <svg className="plate-art" viewBox="0 0 64 64" role="presentation" focusable="false">
+      <g className="art-clock">
+        <circle cx="32" cy="32" r="21" />
+        <path d="M32 13v3M51 32h-3M32 51v-3M13 32h3" />
+        <path d="M32 32V19" />
+        <path d="M32 32l-7-5" />
+      </g>
+    </svg>
+  )
+}
+
+function MissingMenu() {
+  const today = sofiaDate()
+  return (
+    <main className="unavailable-shell unavailable-shell--missing">
+      <section className="unavailable-card" aria-labelledby="missing-title">
+        <span className="eyebrow">Меню за {formatBulgarianDate(today)}</span>
+        <div className="empty-plate empty-plate--missing" aria-hidden="true"><OverdueClock /></div>
+        <h1 id="missing-title">Все още няма меню за днес</h1>
+        <p>
+          Ресторантът може да е затворен или още да не е публикувал днешното меню.
+          Провери Facebook страницата за най-новата информация.
+        </p>
+        <div className="card-note card-note--alert">
+          <span aria-hidden="true">!</span>
+          Обикновено менюто се публикува около <strong>08:30</strong>.
         </div>
         <FacebookLink />
         <small>{DISCLAIMER}</small>
@@ -128,7 +165,8 @@ function PendingMenu() {
 }
 
 function UnavailableMenu() {
-  return isSofiaWeekend(sofiaDate()) ? <ClosedDay /> : <PendingMenu />
+  if (isSofiaWeekend(sofiaDate())) return <ClosedDay />
+  return isMenuOverdue() ? <MissingMenu /> : <PendingMenu />
 }
 
 export function MenuApp({ menu }: { menu: Menu }) {
