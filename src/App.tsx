@@ -1,6 +1,12 @@
 import { useEffect, useMemo, useState } from 'react'
 import currentPublicationData from '../data/current-menu.json'
-import { formatBulgarianDate, isTodayInSofia, sofiaDate } from './lib/date.ts'
+import {
+  formatBulgarianDate,
+  isSofiaWeekend,
+  isTodayInSofia,
+  nextWorkingSofiaDate,
+  sofiaDate,
+} from './lib/date.ts'
 import {
   FACEBOOK_PAGE_URL,
   menuPublicationSchema,
@@ -55,7 +61,55 @@ function QuantityControl({
   )
 }
 
-function UnavailableMenu() {
+const DISCLAIMER = 'Неофициален помощник за координация. Не изпраща поръчка до ресторанта.'
+
+function FacebookLink() {
+  return (
+    <a className="primary-link" href={FACEBOOK_PAGE_URL} target="_blank" rel="noreferrer">
+      Виж Facebook страницата <span aria-hidden="true">↗</span>
+    </a>
+  )
+}
+
+function ClosedCutlery() {
+  return (
+    <svg className="closed-art" viewBox="0 0 64 64" role="presentation" focusable="false">
+      <g className="art-fork" transform="translate(-7 0) rotate(-22 32 32)">
+        <path d="M24 9v13M32 9v13M40 9v13" />
+        <path d="M24 22c0 5.5 3.5 8 8 8s8-2.5 8-8" />
+        <path d="M32 30v26" />
+      </g>
+      <g className="art-knife" transform="translate(7 0) rotate(22 32 32)">
+        <path className="blade" d="M31 8c8 6 8 20 0 24z" />
+        <path d="M31 32v24" />
+      </g>
+    </svg>
+  )
+}
+
+function ClosedDay() {
+  const today = sofiaDate()
+  return (
+    <main className="unavailable-shell unavailable-shell--closed">
+      <section className="unavailable-card" aria-labelledby="closed-title">
+        <span className="eyebrow">{formatBulgarianDate(today)}</span>
+        <div className="empty-plate empty-plate--closed" aria-hidden="true"><ClosedCutlery /></div>
+        <h1 id="closed-title">Днес ресторантът почива</h1>
+        <p>
+          В събота и неделя Mandarin House не предлага обедно меню, затова днес няма какво да покажем.
+        </p>
+        <div className="next-service">
+          <span aria-hidden="true">→</span>
+          Следващо меню: <strong>{formatBulgarianDate(nextWorkingSofiaDate(today))}</strong>
+        </div>
+        <FacebookLink />
+        <small>{DISCLAIMER}</small>
+      </section>
+    </main>
+  )
+}
+
+function PendingMenu() {
   const today = sofiaDate()
   return (
     <main className="unavailable-shell">
@@ -66,13 +120,15 @@ function UnavailableMenu() {
         <p>
           Проверяваме страницата на ресторанта. Няма да покажем старо меню като днешно.
         </p>
-        <a className="primary-link" href={FACEBOOK_PAGE_URL} target="_blank" rel="noreferrer">
-          Виж Facebook страницата <span aria-hidden="true">↗</span>
-        </a>
-        <small>Неофициален помощник за координация. Не изпраща поръчка до ресторанта.</small>
+        <FacebookLink />
+        <small>{DISCLAIMER}</small>
       </section>
     </main>
   )
+}
+
+function UnavailableMenu() {
+  return isSofiaWeekend(sofiaDate()) ? <ClosedDay /> : <PendingMenu />
 }
 
 export function MenuApp({ menu }: { menu: Menu }) {

@@ -1,5 +1,12 @@
 import { SOFIA_TIME_ZONE } from './menu-schema.ts'
 
+const WEEKEND_DAYS = new Set([0, 6])
+
+function utcNoon(date: string): Date {
+  const [year, month, day] = date.split('-').map(Number)
+  return new Date(Date.UTC(year, month - 1, day, 12))
+}
+
 export function sofiaDate(input: Date = new Date()): string {
   const parts = new Intl.DateTimeFormat('en-CA', {
     timeZone: SOFIA_TIME_ZONE,
@@ -12,16 +19,27 @@ export function sofiaDate(input: Date = new Date()): string {
 }
 
 export function formatBulgarianDate(date: string): string {
-  const [year, month, day] = date.split('-').map(Number)
   return new Intl.DateTimeFormat('bg-BG', {
     weekday: 'long',
     year: 'numeric',
     month: 'long',
     day: 'numeric',
     timeZone: SOFIA_TIME_ZONE,
-  }).format(new Date(Date.UTC(year, month - 1, day, 12)))
+  }).format(utcNoon(date))
 }
 
 export function isTodayInSofia(date: string, now: Date = new Date()): boolean {
   return date === sofiaDate(now)
+}
+
+export function isSofiaWeekend(date: string): boolean {
+  return WEEKEND_DAYS.has(utcNoon(date).getUTCDay())
+}
+
+export function nextWorkingSofiaDate(date: string): string {
+  const next = utcNoon(date)
+  do {
+    next.setUTCDate(next.getUTCDate() + 1)
+  } while (WEEKEND_DAYS.has(next.getUTCDay()))
+  return sofiaDate(next)
 }

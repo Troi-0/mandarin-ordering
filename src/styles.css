@@ -125,6 +125,16 @@ footer a { color: var(--orange-dark); font-weight: 800; text-decoration: none; }
 .empty-plate span { color: var(--orange); font: italic 700 3rem Georgia, serif; }
 .primary-link { display: inline-flex; gap: .6rem; margin-top: 1rem; padding: .85rem 1.1rem; color: white; background: var(--green); border-radius: .65rem; font-weight: 800; text-decoration: none; }
 
+.unavailable-shell--closed { background: radial-gradient(circle at 80% 10%, #d9e9b0 0 8rem, transparent 8.1rem), linear-gradient(145deg, #fff8e8, #eef3dd); }
+.empty-plate--closed { background: #f6efdd; }
+.closed-art { width: 64%; height: auto; overflow: visible; }
+.closed-art g { fill: none; stroke: currentColor; stroke-width: 3.6; stroke-linecap: round; stroke-linejoin: round; }
+.closed-art .art-fork { color: var(--green); }
+.closed-art .art-knife { color: var(--orange); }
+.closed-art .blade { fill: currentColor; stroke: none; }
+.next-service { display: inline-flex; flex-wrap: wrap; gap: .45rem; justify-content: center; margin-top: 1.4rem; padding: .6rem 1.1rem; color: var(--green); background: #edf5dc; border-radius: 999px; font-size: .84rem; line-height: 1.5; }
+.next-service strong { color: var(--ink); }
+
 @media (max-width: 900px) {
   .hero-grid { grid-template-columns: 1fr auto; }
   .hero-plate { width: 11rem; }

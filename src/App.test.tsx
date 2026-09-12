@@ -2,6 +2,7 @@ import { render, screen, waitFor } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import { afterEach, describe, expect, it, vi } from 'vitest'
 import currentPublicationData from '../data/current-menu.json'
+import { nextWorkingSofiaDate } from './lib/date.ts'
 import { menuFixture } from './test/menu-fixture.ts'
 import { App, MenuApp } from './App.tsx'
 
@@ -16,15 +17,32 @@ function installClipboard(writeText = vi.fn().mockResolvedValue(undefined)) {
 afterEach(() => vi.useRealTimers())
 
 describe('interactive menu', () => {
-  it('fails closed when the embedded publication date is not today in Sofia', () => {
+  it('fails closed on a working day when the embedded publication date is not today in Sofia', () => {
     if (currentPublicationData.status !== 'ready') throw new Error('Expected a ready test publication')
-    const [year, month, day] = currentPublicationData.menu.date.split('-').map(Number)
+    const [year, month, day] = nextWorkingSofiaDate(currentPublicationData.menu.date).split('-').map(Number)
     vi.useFakeTimers()
-    vi.setSystemTime(new Date(Date.UTC(year, month - 1, day + 1, 12)))
+    vi.setSystemTime(new Date(Date.UTC(year, month - 1, day, 12)))
 
     render(<App />)
 
     expect(screen.getByRole('heading', { name: 'Днешното меню все още не е налично' })).toBeInTheDocument()
+    expect(screen.queryByRole('button', { name: /Добави/ })).not.toBeInTheDocument()
+  })
+
+  it.each([
+    ['събота', '2026-09-05', 'понеделник, 7 септември 2026 г.'],
+    ['неделя', '2026-09-06', 'понеделник, 7 септември 2026 г.'],
+  ])('explains the weekend closure instead of a pending import on %s', (_weekday, date, nextService) => {
+    const [year, month, day] = date.split('-').map(Number)
+    vi.useFakeTimers()
+    vi.setSystemTime(new Date(Date.UTC(year, month - 1, day, 12)))
+
+    render(<App />)
+
+    expect(screen.getByRole('heading', { name: 'Днес ресторантът почива' })).toBeInTheDocument()
+    expect(screen.getByText(/не предлага обедно меню/)).toBeInTheDocument()
+    expect(screen.getByText(nextService)).toBeInTheDocument()
+    expect(screen.queryByRole('heading', { name: 'Днешното меню все още не е налично' })).not.toBeInTheDocument()
     expect(screen.queryByRole('button', { name: /Добави/ })).not.toBeInTheDocument()
   })
 

@@ -1,5 +1,11 @@
 import { describe, expect, it } from 'vitest'
-import { formatBulgarianDate, isTodayInSofia, sofiaDate } from './date.ts'
+import {
+  formatBulgarianDate,
+  isSofiaWeekend,
+  isTodayInSofia,
+  nextWorkingSofiaDate,
+  sofiaDate,
+} from './date.ts'
 
 describe('Sofia calendar date', () => {
   it('handles the spring daylight-saving transition', () => {
@@ -22,5 +28,26 @@ describe('Sofia calendar date', () => {
     const formatted = formatBulgarianDate('2026-08-24')
     expect(formatted).toContain('24 август 2026 г.')
     expect(formatted).toContain('понеделник')
+  })
+})
+
+describe('Sofia working days', () => {
+  it('treats only Saturday and Sunday as restaurant rest days', () => {
+    expect(isSofiaWeekend('2026-09-04')).toBe(false)
+    expect(isSofiaWeekend('2026-09-05')).toBe(true)
+    expect(isSofiaWeekend('2026-09-06')).toBe(true)
+    expect(isSofiaWeekend('2026-09-07')).toBe(false)
+  })
+
+  it('points every weekend and Friday at the following Monday', () => {
+    expect(nextWorkingSofiaDate('2026-09-04')).toBe('2026-09-07')
+    expect(nextWorkingSofiaDate('2026-09-05')).toBe('2026-09-07')
+    expect(nextWorkingSofiaDate('2026-09-06')).toBe('2026-09-07')
+    expect(nextWorkingSofiaDate('2026-09-07')).toBe('2026-09-08')
+  })
+
+  it('crosses the autumn daylight-saving change and the year boundary', () => {
+    expect(nextWorkingSofiaDate('2026-10-24')).toBe('2026-10-26')
+    expect(nextWorkingSofiaDate('2026-12-31')).toBe('2027-01-01')
   })
 })
