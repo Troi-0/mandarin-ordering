@@ -67,7 +67,7 @@ describe('scheduled handler in workerd', () => {
     const controller = createScheduledController({ scheduledTime: Date.parse('2026-09-04T06:52:00Z'), cron: '7,22,37,52 5-11 * * MON-FRI' })
     await worker.scheduled(controller, env)
 
-    expect(requests).toHaveLength(16)
+    expect(requests).toHaveLength(17)
     const headers = requests[0]!.init?.headers as Record<string, string> | undefined
     const jwt = String(headers?.authorization).replace('Bearer ', '')
     await expect(verifyJwt(jwt)).resolves.toMatchObject({ iss: 'Iv23liTestClient01' })

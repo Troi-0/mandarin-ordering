@@ -4,7 +4,9 @@ import worker, {
   checkAndRecover,
   createAppJwt,
   evaluateRecovery,
+  MAX_FAILED_IMPORTS_FOR_PAGES_RECOVERY,
   MAX_FAILED_IMPORTS_PER_DAY,
+  MAX_FAILED_PAGES_RUNS_PER_DAY,
   readAppConfig,
   type SchedulerEnv,
 } from './worker.ts'
@@ -86,6 +88,7 @@ function github(options: {
   importerRuns?: Run[]
   completedImports?: Run[]
   pagesRuns?: Run[]
+  completedPages?: Run[]
   dispatch?: Response
 } = {}) {
   return vi.fn(async (input: string | URL | Request, init?: RequestInit) => {
@@ -108,6 +111,7 @@ function github(options: {
       return response({ workflow_runs: (options.importerRuns ?? []).filter((run) => run.status === status) })
     }
     if (url.pathname.endsWith('/deploy-pages.yml/runs')) {
+      if (status === 'completed') return response({ workflow_runs: options.completedPages ?? [] })
       const runs = options.pagesRuns ?? [{ status: 'completed', conclusion: 'success', head_sha: HEAD_SHA }]
       return response({ workflow_runs: runs.filter((run) => (status === 'success'
         ? run.conclusion === 'success' && run.head_sha === url.searchParams.get('head_sha')
@@ -147,7 +151,7 @@ const sofiaTime = new Intl.DateTimeFormat('en-GB', {
 
 function decisionAt(now: Date, overrides: Partial<Parameters<typeof evaluateRecovery>[0]> = {}) {
   return evaluateRecovery({
-    publication: null, headSha: HEAD_SHA, importerRuns: [], pagesRuns: [], failedImportsToday: 0, now, ...overrides,
+    publication: null, headSha: HEAD_SHA, importerRuns: [], pagesRuns: [], failedImportsToday: 0, failedPagesToday: 0, now, ...overrides,
   })
 }
 
@@ -213,17 +217,41 @@ describe('Sofia recovery window', () => {
     })).toMatchObject({ dispatch: true, reason: 'pages-missing' })
   })
 
-  it('stops dispatching after the daily failure cap but still recognises a ready menu', () => {
+  it('stops importing a missing menu after the daily failure cap', () => {
     expect(decisionAt(FRIDAY_MORNING, { failedImportsToday: MAX_FAILED_IMPORTS_PER_DAY - 1 }))
       .toMatchObject({ dispatch: true, reason: 'stale' })
     expect(decisionAt(FRIDAY_MORNING, { failedImportsToday: MAX_FAILED_IMPORTS_PER_DAY }))
       .toMatchObject({ dispatch: false, reason: 'attempts-exhausted' })
-    expect(decisionAt(FRIDAY_MORNING, { publication: publication(), failedImportsToday: MAX_FAILED_IMPORTS_PER_DAY }))
-      .toMatchObject({ dispatch: false, reason: 'attempts-exhausted' })
+    // Pages failures belong to the other budget and must not unblock or block imports.
+    expect(decisionAt(FRIDAY_MORNING, { failedPagesToday: MAX_FAILED_PAGES_RUNS_PER_DAY }))
+      .toMatchObject({ dispatch: true, reason: 'stale' })
+  })
+
+  it('still recovers a missing Pages deployment after the import budget is spent', () => {
+    const readyMenu = { publication: publication(), pagesRuns: [] }
+    expect(decisionAt(FRIDAY_MORNING, { ...readyMenu, failedImportsToday: MAX_FAILED_IMPORTS_PER_DAY }))
+      .toMatchObject({ dispatch: true, reason: 'pages-missing' })
+    expect(decisionAt(FRIDAY_MORNING, { ...readyMenu, failedImportsToday: MAX_FAILED_IMPORTS_FOR_PAGES_RECOVERY - 1 }))
+      .toMatchObject({ dispatch: true, reason: 'pages-missing' })
+    expect(decisionAt(FRIDAY_MORNING, { ...readyMenu, failedPagesToday: MAX_FAILED_PAGES_RUNS_PER_DAY - 1 }))
+      .toMatchObject({ dispatch: true, reason: 'pages-missing' })
+  })
+
+  it('bounds Pages recovery so a broken deployment cannot loop all day', () => {
+    const readyMenu = { publication: publication(), pagesRuns: [] }
+    expect(decisionAt(FRIDAY_MORNING, { ...readyMenu, failedPagesToday: MAX_FAILED_PAGES_RUNS_PER_DAY }))
+      .toMatchObject({ dispatch: false, reason: 'pages-attempts-exhausted' })
+    expect(decisionAt(FRIDAY_MORNING, { ...readyMenu, failedImportsToday: MAX_FAILED_IMPORTS_FOR_PAGES_RECOVERY }))
+      .toMatchObject({ dispatch: false, reason: 'pages-attempts-exhausted' })
+    expect(MAX_FAILED_IMPORTS_FOR_PAGES_RECOVERY).toBeGreaterThan(MAX_FAILED_IMPORTS_PER_DAY)
+  })
+
+  it('reports a verified publication as ready whatever either budget says', () => {
     expect(decisionAt(FRIDAY_MORNING, {
       publication: publication(),
       pagesRuns: [{ status: 'completed', conclusion: 'success', head_sha: HEAD_SHA }],
-      failedImportsToday: MAX_FAILED_IMPORTS_PER_DAY,
+      failedImportsToday: MAX_FAILED_IMPORTS_FOR_PAGES_RECOVERY,
+      failedPagesToday: MAX_FAILED_PAGES_RUNS_PER_DAY,
     })).toMatchObject({ dispatch: false, reason: 'ready' })
   })
 })
@@ -316,7 +344,7 @@ describe('menu recovery against GitHub', () => {
       .resolves.toEqual({ dispatch: false, reason: 'ready', sofiaDate: '2026-09-04' })
 
     const requests = calls(fetchMock)
-    expect(requests).toHaveLength(15)
+    expect(requests).toHaveLength(16)
     expect(requests.every(({ url }) => url.origin === 'https://api.github.com')).toBe(true)
     const commit = requests.find(({ url }) => url.pathname.endsWith('/commits/master'))!
     expect(commit.init?.headers).toMatchObject({ accept: 'application/vnd.github.sha' })
@@ -333,16 +361,18 @@ describe('menu recovery against GitHub', () => {
   it.each([
     ['summer', FRIDAY_MORNING, '2026-09-04', '>=2026-09-04T00:00:00+03:00'],
     ['winter', new Date('2026-12-04T07:50:00Z'), '2026-12-04', '>=2026-12-04T00:00:00+02:00'],
-  ])('counts only today’s importer runs from Sofia midnight in %s', async (_, now, date, created) => {
+  ])('counts only today’s importer and Pages runs from Sofia midnight in %s', async (_, now, date, created) => {
     const fetchMock = github({ menu: publication(date) })
     await expect(checkAndRecover(now, env(), fetchMock)).resolves.toMatchObject({ reason: 'ready' })
-    const completed = calls(fetchMock).find(({ url }) => (
-      url.pathname.endsWith('/import-facebook.yml/runs') && url.searchParams.get('status') === 'completed'
-    ))!
-    expect(Object.fromEntries(completed.url.searchParams)).toEqual({
-      branch: 'master', status: 'completed', created, per_page: '100',
-    })
-    expect(completed.url.search).toContain('%2B0')
+    for (const workflow of ['import-facebook.yml', 'deploy-pages.yml']) {
+      const completed = calls(fetchMock).find(({ url }) => (
+        url.pathname.endsWith(`/${workflow}/runs`) && url.searchParams.get('status') === 'completed'
+      ))!
+      expect(Object.fromEntries(completed.url.searchParams)).toEqual({
+        branch: 'master', status: 'completed', created, per_page: '100',
+      })
+      expect(completed.url.search).toContain('%2B0')
+    }
   })
 
   it('does not duplicate an active importer', async () => {
@@ -388,7 +418,7 @@ describe('menu recovery against GitHub', () => {
       dispatch: true, reason, sofiaDate: '2026-09-04', runUrl: RUN_URL,
     })
     const requests = calls(fetchMock)
-    expect(requests).toHaveLength(16)
+    expect(requests).toHaveLength(17)
     const dispatch = requests.at(-1)!
     expect(dispatch.url.href).toBe(DISPATCH_URL)
     expect(dispatch.init).toMatchObject({
@@ -406,6 +436,64 @@ describe('menu recovery against GitHub', () => {
     await expect(checkAndRecover(FRIDAY_MORNING, env(), fetchMock))
       .resolves.toMatchObject({ dispatch: false, reason: 'attempts-exhausted' })
     expect(calls(fetchMock).some(({ url }) => url.href === DISPATCH_URL)).toBe(false)
+  })
+
+  it('redeploys a ready menu after three failed imports, then stops on three failed Pages runs', async () => {
+    const failedImports = ['failure', 'timed_out', 'startup_failure'].map((conclusion) => ({ status: 'completed', conclusion }))
+    const recovering = github({
+      pagesRuns: [],
+      completedImports: failedImports,
+      completedPages: [{ status: 'completed', conclusion: 'failure' }, { status: 'completed', conclusion: 'cancelled' }],
+      dispatch: response({ workflow_run_id: 123, html_url: RUN_URL }),
+    })
+    await expect(checkAndRecover(FRIDAY_MORNING, env(), recovering))
+      .resolves.toMatchObject({ dispatch: true, reason: 'pages-missing', runUrl: RUN_URL })
+
+    const exhausted = github({
+      pagesRuns: [],
+      completedImports: failedImports,
+      completedPages: ['failure', 'timed_out', 'failure'].map((conclusion) => ({ status: 'completed', conclusion })),
+    })
+    await expect(checkAndRecover(FRIDAY_MORNING, env(), exhausted))
+      .resolves.toMatchObject({ dispatch: false, reason: 'pages-attempts-exhausted' })
+    expect(calls(exhausted).some(({ url }) => url.href === DISPATCH_URL)).toBe(false)
+  })
+
+  it('spends the Pages budget on cancelled runs, which cancel-in-progress produces', async () => {
+    const fetchMock = github({
+      pagesRuns: [],
+      completedPages: Array.from({ length: 3 }, () => ({ status: 'completed', conclusion: 'cancelled' })),
+    })
+    await expect(checkAndRecover(FRIDAY_MORNING, env(), fetchMock))
+      .resolves.toMatchObject({ dispatch: false, reason: 'pages-attempts-exhausted' })
+    expect(calls(fetchMock).some(({ url }) => url.href === DISPATCH_URL)).toBe(false)
+  })
+
+  it.each(['action_required', 'stale', 'neutral', 'skipped', null])(
+    'counts a completed %s Pages run as unsuccessful', async (conclusion) => {
+      const fetchMock = github({
+        pagesRuns: [],
+        completedPages: [
+          { status: 'completed', conclusion: 'failure' },
+          { status: 'completed', conclusion: 'cancelled' },
+          { status: 'completed', conclusion },
+          { status: 'completed', conclusion: 'success' },
+        ],
+      })
+      await expect(checkAndRecover(FRIDAY_MORNING, env(), fetchMock))
+        .resolves.toMatchObject({ dispatch: false, reason: 'pages-attempts-exhausted' })
+    },
+  )
+
+  it('does not treat cancelled or other non-failure importer runs as failed imports', async () => {
+    const fetchMock = github({
+      menu: publication('2026-09-03'),
+      completedImports: ['cancelled', 'cancelled', 'cancelled', 'action_required', 'skipped']
+        .map((conclusion) => ({ status: 'completed', conclusion })),
+      dispatch: response({ workflow_run_id: 123, html_url: RUN_URL }),
+    })
+    await expect(checkAndRecover(FRIDAY_MORNING, env(), fetchMock))
+      .resolves.toMatchObject({ dispatch: true, reason: 'stale' })
   })
 
   it('surfaces a failed dispatch for Cloudflare observability', async () => {

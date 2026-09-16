@@ -102,20 +102,43 @@ Inside it:
    immutable SHA through the Contents API.
 3. It queries active import and Pages runs by each active status, so an older
    waiting run cannot hide behind newer completed runs, plus successful Pages
-   runs for that exact SHA and today's completed importer runs from Sofia
-   midnight.
+   runs for that exact SHA and today's completed importer and Pages runs from
+   Sofia midnight.
 4. It decides:
 
 | Result | Meaning |
 | --- | --- |
 | `import-active` / `pages-active` | Work already in progress; nothing dispatched. |
 | `ready` | Today's plausible menu is on a commit with a successful exact-SHA Pages run. |
-| `attempts-exhausted` | Three importer runs failed, timed out, or failed to start today. The Worker stops dispatching so a persistent Facebook or OCR failure cannot turn into an all-day storm of Playwright scrapes, free Gemini calls, and review-draft commits. Fix the cause, then dispatch the importer manually. |
+| `attempts-exhausted` | Today's menu is missing and three importer runs failed, timed out, or failed to start today. The Worker stops importing so a persistent Facebook or OCR failure cannot turn into an all-day storm of Playwright scrapes, free Gemini calls, and review-draft commits. Fix the cause, then dispatch the importer manually. |
+| `pages-attempts-exhausted` | Today's menu is ready but its exact commit has no successful Pages run, and either three Pages runs ended without success or six importer runs failed today. Look at the Pages workflow, then dispatch it or the importer manually. |
 | `stale` / `pages-missing` | The importer is dispatched once with `{"ref":"master","inputs":{"dry_run":"false"}}`; the Worker validates and logs the returned run URL. |
 
-The failure count includes every importer run on `master` today, including a
-maintainer's failed dry runs. A day spent debugging with dry runs can therefore
-also stop automatic dispatch; dispatch manually after the fix.
+The two budgets are separate on purpose. A `pages-missing` dispatch never reaches
+Facebook or Gemini: the importer sees today's ready menu and only reconciles Pages.
+So a morning of failed imports does not stop the Worker from redeploying a menu
+that a maintainer or a backup run published later. That recovery is still bounded
+by unsuccessful Pages runs and a ceiling of six failed importer runs, so the Worker
+cannot keep retrying a broken Pages build or reconcile step all day. The watchdog
+only checks menu freshness, which is why this recovery has to live in the Worker.
+
+The two budgets count differently. An importer run counts only when it failed,
+timed out, or failed to start: the `menu-import` concurrency group routinely
+cancels superseded pending runs, which says nothing about importing being broken.
+A Pages run counts whenever it completed without success, cancellations included.
+Pages uses `cancel-in-progress`, so a stream of superseded deployments would
+otherwise never spend the budget. On a day of rapid site pushes, cancelled
+deployments can therefore exhaust it early; the push that follows still deploys.
+
+Both counts include every run on `master` today, including a maintainer's failed
+dry runs. A day spent debugging with dry runs can therefore also stop automatic
+dispatch; dispatch manually after the fix.
+
+These budgets limit only the Worker's own dispatches. Any importer run started
+elsewhere, including GitHub's native schedule until the cutover removes it,
+manual runs, watchdog dispatches, and manual-inbox imports, still reconciles Pages
+on its own. GitHub's schedule has been creating about one run per weekday, so
+that adds at most a late extra reconcile, not a loop.
 
 The dispatch contract uses `X-GitHub-Api-Version: 2026-03-10`. A successful
 response is HTTP 200 with `workflow_run_id` and `html_url`. Dispatch is not retried
@@ -207,7 +230,9 @@ Connecting the existing Worker to Workers Builds keeps the deployed version equa
   unit tests with coverage and the workerd integration test, and bundles.
 - Deploy command: `npm run deploy`.
 - Non-production branch builds: disabled.
-- Build watch paths: include `workers/menu-scheduler/*`.
+- Build watch paths: include only `workers/menu-scheduler/*`. The dashboard adds
+  this next to its default `*`; remove the `*` entry, or every menu and site commit
+  rebuilds and redeploys the Worker.
 
 Workers Builds creates a user API token by default with Workers Scripts, KV, R2, and
 all-zone Workers Routes edit permissions. Only user tokens are supported. It lives in
@@ -263,23 +288,28 @@ An App can hold up to 25 private keys at once, and keys never expire. To rotate:
 
 If the scheduler is retired, delete the Worker and the GitHub App together.
 
-### Free-plan boundaries
+### Plan and resource boundaries
 
-Workers Free allows 100,000 requests/day, 50 external subrequests per invocation,
-and 10 ms CPU per invocation. The Worker uses 28 invocations per weekday and at most
-16 subrequests: token, SHA, menu, ten active-run queries, exact Pages, today's
-imports, and dispatch. Tests assert that count. A configured `limits` block is only
-supported on the Standard usage model, so none is set. Network waiting is not CPU,
-but check deployed CPU time after the first real runs. Workers Logs on Free keep
-three days.
+The Worker uses 28 invocations per weekday and at most 17 subrequests: token, SHA,
+menu, ten active-run queries, exact Pages, today's importer runs, today's Pages runs,
+and dispatch. Tests assert that count. Network waiting is not CPU time.
 
-The scheduler package pins Wrangler to the version `@cloudflare/vitest-pool-workers`
-depends on so tests and deploys share one workerd runtime. It also overrides `sharp`
-to a patched release; Miniflare uses `sharp` only for local image simulation, which
-this Worker does not use. It is a separate package so the importer, Pages, and root
-installs never download the 130 MB workerd binary. The existing zero-cost check
-scans both manifests but does not inspect Cloudflare or Gemini billing settings;
-verify those in each provider.
+It fits Workers Free (100,000 requests/day, 50 external subrequests and 10 ms CPU
+per invocation), but the account currently reports the Standard usage model, which
+Cloudflare documents as the Workers Paid plan. Confirm the plan in the dashboard.
+On Paid, this Worker's roughly 600 checks a month sit far inside the included 10
+million requests and 30 million CPU milliseconds, so it adds no cost, but the CPU
+limit defaults to 30 seconds rather than 10 ms. No `limits` block is set yet: read
+the real CPU time from the first invocation logs, then, if the account is Paid, add
+a runaway guard with headroom such as `"limits": {"cpu_ms": 50, "subrequests": 25}`.
+Workers Logs keep three days on Free.
+
+The scheduler package pins Wrangler to the exact version `@cloudflare/vitest-plugin`
+depends on, so tests and deploys share one workerd runtime; upgrade both together
+and regenerate `worker-configuration.d.ts` with `npm run types`. It is a separate
+package so the importer, Pages, and root installs never download the workerd
+binary. The existing zero-cost check scans both manifests but does not inspect
+Cloudflare or Gemini billing settings; verify those in each provider.
 
 Cloudflare outages or free limits, App key revocation, GitHub API or runner outages,
 and Facebook or Gemini failures can still prevent a publication. Logs make failures

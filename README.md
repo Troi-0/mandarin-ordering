@@ -25,8 +25,9 @@ that package once with `npm ci --prefix workers/menu-scheduler`.
 - A schedule-only Cloudflare Worker is the authoritative trigger. From Monday
   through Friday it checks the committed menu, active runs, and the exact Pages
   deployment every 15 minutes from 08:37 through 13:52 Sofia time, dispatching
-  the importer only when recovery is needed and stopping after three failed
-  imports in a day. It authenticates as a private GitHub App whose one-hour
+  the importer only when recovery is needed. It stops importing after three
+  failed imports in a day, while a missing site deployment keeps its own small
+  retry budget. It authenticates as a private GitHub App whose one-hour
   installation tokens are scoped to this repository; the App key is an encrypted
   Worker secret. See [docs/operations.md](docs/operations.md).
 - GitHub's own schedules, four importer attempts per hour from 08:07 through
