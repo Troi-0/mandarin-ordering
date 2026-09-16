@@ -1,5 +1,5 @@
 import react from '@vitejs/plugin-react'
-import { defineConfig } from 'vitest/config'
+import { configDefaults, defineConfig } from 'vitest/config'
 
 export default defineConfig({
   base: process.env.GITHUB_ACTIONS ? '/mandarin-ordering/' : '/',
@@ -7,10 +7,12 @@ export default defineConfig({
   test: {
     environment: 'jsdom',
     setupFiles: ['./src/test/setup.ts'],
+    // The scheduler is a separate package with its own workerd test pool.
+    exclude: [...configDefaults.exclude, 'workers/**'],
     coverage: {
       provider: 'v8',
       reporter: ['text', 'json-summary'],
-      include: ['src/**/*.{ts,tsx}', 'scripts/lib/**/*.ts', 'workers/**/*.ts'],
+      include: ['src/**/*.{ts,tsx}', 'scripts/lib/**/*.ts'],
       exclude: [
         'src/main.tsx',
         'src/vite-env.d.ts',

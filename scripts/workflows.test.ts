@@ -12,6 +12,8 @@ describe('GitHub workflow contracts', () => {
     expect(ci).toContain('pull_request:')
     expect(ci).toContain('permissions:\n  contents: read')
     expect(ci).toContain('run: npm ci')
+    expect(ci).toContain('run: npm ci --prefix workers/menu-scheduler')
+    expect(ci).toContain('workers/menu-scheduler/package-lock.json')
     expect(ci).toContain('run: npm run check')
     expect(ci).not.toContain('GEMINI_API_KEY')
   })
