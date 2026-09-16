@@ -16,6 +16,12 @@ const WINDOW_CLOSES_AT_MINUTE = 14 * 60
 // A persistent Facebook or OCR failure must not become an all-day retry storm
 // of Playwright scrapes, free Gemini calls, and review-draft commits.
 export const MAX_FAILED_IMPORTS_PER_DAY = 3
+// Recovering a missing Pages deployment never scrapes or transcribes: the
+// importer sees today's ready menu and only reconciles. It therefore keeps its
+// own budget after imports are exhausted, bounded by failed Pages runs and a
+// hard ceiling on importer failures so a broken deploy cannot loop all day.
+export const MAX_FAILED_PAGES_RUNS_PER_DAY = 3
+export const MAX_FAILED_IMPORTS_FOR_PAGES_RECOVERY = 6
 const TOKEN_PERMISSIONS = { actions: 'write', contents: 'read' } as const
 // JWT issued-at is backdated for clock drift; GitHub rejects exp beyond 10 minutes.
 const JWT_BACKDATE_SECONDS = 60
@@ -60,6 +66,7 @@ interface RecoveryInputs {
   importerRuns: WorkflowRun[]
   pagesRuns: WorkflowRun[]
   failedImportsToday: number
+  failedPagesToday: number
   now: Date
 }
 
@@ -69,6 +76,7 @@ export type RecoveryReason =
   | 'pages-active'
   | 'ready'
   | 'attempts-exhausted'
+  | 'pages-attempts-exhausted'
   | 'stale'
   | 'pages-missing'
 
@@ -144,8 +152,16 @@ export function evaluateRecovery(inputs: RecoveryInputs): RecoveryDecision {
   if (menuReady && inputs.pagesRuns.some((run) => (
     run.head_sha === inputs.headSha && run.status === 'completed' && run.conclusion === 'success'
   ))) return decide(false, 'ready')
-  if (inputs.failedImportsToday >= MAX_FAILED_IMPORTS_PER_DAY) return decide(false, 'attempts-exhausted')
-  return decide(true, menuReady ? 'pages-missing' : 'stale')
+  if (!menuReady) {
+    return inputs.failedImportsToday >= MAX_FAILED_IMPORTS_PER_DAY
+      ? decide(false, 'attempts-exhausted')
+      : decide(true, 'stale')
+  }
+  if (inputs.failedPagesToday >= MAX_FAILED_PAGES_RUNS_PER_DAY
+    || inputs.failedImportsToday >= MAX_FAILED_IMPORTS_FOR_PAGES_RECOVERY) {
+    return decide(false, 'pages-attempts-exhausted')
+  }
+  return decide(true, 'pages-missing')
 }
 
 function positiveId(value: unknown, name: string): number {
@@ -317,11 +333,16 @@ async function activeWorkflowRuns(workflow: string, token: string, fetchImpl: ty
   return results.flat()
 }
 
-async function failedImportsToday(now: Date, token: string, fetchImpl: typeof fetch): Promise<number> {
+async function failedRunsToday(
+  workflow: string,
+  now: Date,
+  token: string,
+  fetchImpl: typeof fetch,
+): Promise<number> {
   const clock = sofiaClock(now)
   // The offset at the current time equals midnight's on every weekday; Sofia
   // changes offset only on Sunday nights, outside the recovery window.
-  const runs = await listRuns(runsPath(IMPORT_WORKFLOW, {
+  const runs = await listRuns(runsPath(workflow, {
     status: 'completed',
     created: `>=${clock.date}T00:00:00${clock.offset}`,
     per_page: '100',
@@ -343,6 +364,7 @@ export async function checkAndRecover(
     importerRuns: [],
     pagesRuns: [],
     failedImportsToday: 0,
+    failedPagesToday: 0,
     now,
   })
   // Cloudflare Cron is UTC-only. Keep its configured range broad and gate with
@@ -358,14 +380,15 @@ export async function checkAndRecover(
   }
 
   // Every remaining read is pinned to that immutable SHA or filtered by it.
-  const [publication, importerRuns, pagesRuns, exactPagesRuns, failedImports] = await Promise.all([
+  const [publication, importerRuns, pagesRuns, exactPagesRuns, failedImports, failedPages] = await Promise.all([
     githubGet(
       `/repos/${REPOSITORY}/contents/${MENU_PATH}?ref=${headSha}`, token, fetchImpl, 'application/vnd.github.raw+json',
     ).then((response) => readJson<unknown>(response)),
     activeWorkflowRuns(IMPORT_WORKFLOW, token, fetchImpl),
     activeWorkflowRuns(PAGES_WORKFLOW, token, fetchImpl),
     listRuns(runsPath(PAGES_WORKFLOW, { status: 'success', head_sha: headSha, per_page: '1' }), token, fetchImpl),
-    failedImportsToday(now, token, fetchImpl),
+    failedRunsToday(IMPORT_WORKFLOW, now, token, fetchImpl),
+    failedRunsToday(PAGES_WORKFLOW, now, token, fetchImpl),
   ])
 
   const decision = evaluateRecovery({
@@ -374,6 +397,7 @@ export async function checkAndRecover(
     importerRuns,
     pagesRuns: [...pagesRuns, ...exactPagesRuns],
     failedImportsToday: failedImports,
+    failedPagesToday: failedPages,
     now,
   })
   if (!decision.dispatch) return decision
