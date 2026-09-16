@@ -288,28 +288,38 @@ An App can hold up to 25 private keys at once, and keys never expire. To rotate:
 
 If the scheduler is retired, delete the Worker and the GitHub App together.
 
-### Plan and resource boundaries
+### Workers Free boundaries
 
-The Worker uses 28 invocations per weekday and at most 17 subrequests: token, SHA,
-menu, ten active-run queries, exact Pages, today's importer runs, today's Pages runs,
-and dispatch. Tests assert that count. Network waiting is not CPU time.
+The Cloudflare account is on **Workers Free**, and the whole project must stay free of
+charges. Free has no billing for Workers usage: going over a limit makes invocations
+fail or logs get sampled; it never creates a bill. Keep it that way: do not upgrade the
+plan, and do not add paid products (Logpush, Workers Paid features, or storage and
+bindings that require a payment method) to this Worker. The API reports
+`usage_model: standard` even on this Free account; that label is not a plan.
 
-It fits Workers Free (100,000 requests/day, 50 external subrequests and 10 ms CPU
-per invocation), but the account currently reports the Standard usage model, which
-Cloudflare documents as the Workers Paid plan. Confirm the plan in the dashboard.
-On Paid, this Worker's roughly 600 checks a month sit far inside the included 10
-million requests and 30 million CPU milliseconds, so it adds no cost, but the CPU
-limit defaults to 30 seconds rather than 10 ms. No `limits` block is set yet: read
-the real CPU time from the first invocation logs, then, if the account is Paid, add
-a runaway guard with headroom such as `"limits": {"cpu_ms": 50, "subrequests": 25}`.
-Workers Logs keep three days on Free.
+| Free limit | This Worker |
+| --- | --- |
+| 100,000 requests per day | 28 Cron invocations per weekday |
+| 50 subrequests per invocation | at most 17 (token, SHA, menu, ten active-run queries, exact Pages, today's importer runs, today's Pages runs, dispatch), asserted by tests |
+| 10 ms CPU per Cron invocation | about 1.2 ms of signing and JSON parsing measured locally for a heavy day (30 importer and 30 Pages runs listed); network waiting is not CPU |
+| 5 Cron Triggers per account | 1, shared with any other Worker on the account |
+| 200,000 log and trace events per day, 3-day retention | about 450 events per weekday; traces are free in beta and count toward this same allowance from 1 October 2026 |
+| Workers Builds: 3,000 build minutes a month, 1 concurrent build | builds only when `workers/menu-scheduler/` changes |
+
+No `limits` block is configured: configurable CPU and subrequest limits belong to
+paid usage, and Free already enforces the caps above. Confirm real CPU time in the
+first invocation logs; an invocation over 10 ms fails and the next check retries.
+`npm run validate:cost` rejects any scheduler configuration key outside the
+free-only allowlist, including `limits`, bindings, routes, Logpush, and extra
+triggers.
 
 The scheduler package pins Wrangler to the exact version `@cloudflare/vitest-plugin`
 depends on, so tests and deploys share one workerd runtime; upgrade both together
 and regenerate `worker-configuration.d.ts` with `npm run types`. It is a separate
 package so the importer, Pages, and root installs never download the workerd
-binary. The existing zero-cost check scans both manifests but does not inspect
-Cloudflare or Gemini billing settings; verify those in each provider.
+binary. The zero-cost check scans both manifests and the scheduler's Wrangler
+configuration, but cannot see provider billing settings: keep the Cloudflare account
+on Workers Free and the Gemini project without a billing account.
 
 Cloudflare outages or free limits, App key revocation, GitHub API or runner outages,
 and Facebook or Gemini failures can still prevent a publication. Logs make failures
