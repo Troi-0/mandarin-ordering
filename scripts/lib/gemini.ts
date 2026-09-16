@@ -176,6 +176,20 @@ const blindVerificationPrompt = [
   'Do not include the restaurant name, date heading, phone number, or ordering caption as items.',
 ].join('\n')
 
+const focusedResolutionPrompt = [
+  'Perform a final independent close inspection of this Bulgarian restaurant menu image.',
+  'Return every visible category and every purchasable line item in reading order.',
+  'Use the original visible pixels only; do not assume or reconstruct what a menu would normally say.',
+  'Pay special attention to text crossing decorative artwork and to every leading decimal-price digit.',
+  'Visually zoom in before deciding that a character is hidden. If its strokes remain visible through or beside the artwork, transcribe the visible character.',
+  'Transcribe every category and item name character-for-character without spellchecking, autocorrecting, standardizing, expanding, or completing it.',
+  'Do not include printed list numbers such as 1. or 10. in category or item names.',
+  'Normalize portions as 350 мл, 350 г, or 2 бр.; convert printed гр to г and do not invent a portion.',
+  'Convert euro prices to integer cents. A printed 2.70€ is 270.',
+  'If close inspection still cannot distinguish any text or digit, mark the item and whole result uncertain instead of guessing.',
+  'Do not include the restaurant name, date heading, phone number, or ordering caption as items.',
+].join('\n')
+
 function apiKey(): string {
   const key = process.env.GEMINI_API_KEY?.trim()
   if (!key) throw new Error('GEMINI_API_KEY is required; configure a billing-disabled free-tier project')
@@ -226,8 +240,12 @@ export async function generateJson(
   const imagePart: Record<string, unknown> = {
     inlineData: { mimeType, data: Buffer.from(image).toString('base64') },
   }
-  if (config.mediaResolution === 'ultra-high') {
-    imagePart.mediaResolution = { level: 'MEDIA_RESOLUTION_ULTRA_HIGH' }
+  if (config.mediaResolution) {
+    imagePart.mediaResolution = {
+      level: config.mediaResolution === 'ultra-high'
+        ? 'MEDIA_RESOLUTION_ULTRA_HIGH'
+        : 'MEDIA_RESOLUTION_HIGH',
+    }
   }
   const generationConfig: Record<string, unknown> = {
     responseMimeType: 'application/json',
@@ -236,9 +254,6 @@ export async function generateJson(
   if (config.temperature !== undefined) generationConfig.temperature = config.temperature
   if (config.thinkingLevel) {
     generationConfig.thinkingConfig = { thinkingLevel: config.thinkingLevel }
-  }
-  if (config.mediaResolution === 'high') {
-    generationConfig.mediaResolution = 'MEDIA_RESOLUTION_HIGH'
   }
   const requestBody = JSON.stringify({
     contents: [{
@@ -331,6 +346,23 @@ export async function verifyMenu(
   return normalizeTranscription(extractedMenuSchema.parse(result))
 }
 
+export async function resolveMenu(
+  image: Uint8Array,
+  mimeType: string,
+  config: GeminiConfig = PRODUCTION_GEMINI_CONFIG,
+  policy: GeminiRequestPolicy = {},
+): Promise<ExtractedMenu> {
+  const result = await generateJson(
+    focusedResolutionPrompt,
+    image,
+    mimeType,
+    extractionJsonSchema,
+    config,
+    policy,
+  )
+  return normalizeTranscription(extractedMenuSchema.parse(result))
+}
+
 export function normalizeTranscription(transcript: ExtractedMenu): ExtractedMenu {
   return {
     ...transcript,
@@ -383,10 +415,29 @@ function categoriesByNormalizedName(categories: ExtractedMenu['categories']) {
   return indexed
 }
 
-function transcriptionHasUncertainty(transcript: ExtractedMenu): boolean {
+export function transcriptionHasUncertainty(transcript: ExtractedMenu): boolean {
   return transcript.uncertain
     || transcript.uncertaintyNotes.length > 0
     || transcript.categories.some((category) => category.items.some((item) => item.uncertain))
+}
+
+export function compareTranscriptData(
+  first: ExtractedMenu,
+  second: ExtractedMenu,
+): Verification {
+  const withoutUncertainty = (transcript: ExtractedMenu): ExtractedMenu => ({
+    ...structuredClone(transcript),
+    uncertain: false,
+    uncertaintyNotes: [],
+    categories: transcript.categories.map((category) => ({
+      ...structuredClone(category),
+      items: category.items.map((item) => ({
+        ...structuredClone(item),
+        uncertain: false,
+      })),
+    })),
+  })
+  return compareTranscriptions(withoutUncertainty(first), withoutUncertainty(second))
 }
 
 export function comparePriceBenchmark(

@@ -276,6 +276,8 @@ describe('menu import orchestration', () => {
     const extracted = await approvedTranscript()
     const verificationTranscript = structuredClone(extracted)
     verificationTranscript.categories[0].items[0].priceCents += 1
+    const resolutionTranscript = structuredClone(extracted)
+    resolutionTranscript.categories[0].items[0].priceCents += 2
     const importer = createMenuImporter({
       root: testRoot,
       dryRun: false,
@@ -283,6 +285,7 @@ describe('menu import orchestration', () => {
       fetchFacebook: async () => facebookResult(),
       extract: async () => structuredClone(extracted),
       verify: async () => structuredClone(verificationTranscript),
+      resolve: async () => structuredClone(resolutionTranscript),
     })
 
     await expect(importer.runFacebook()).rejects.toThrow('draft saved')
@@ -305,9 +308,73 @@ describe('menu import orchestration', () => {
       approved: false,
       issues: [expect.objectContaining({ field: 'price' })],
     })
+    expect(draft).toMatchObject({
+      resolution: {
+        certain: true,
+        agreesWithExtraction: false,
+        agreesWithVerification: false,
+      },
+    })
     expect(menuSchema.safeParse(draft.editableMenu).success).toBe(false)
     expect(await pathExists(path.join(testRoot, 'data/current-menu.json'))).toBe(false)
     expect(await pathExists(path.join(testRoot, `data/menus/${TODAY}.json`))).toBe(false)
+  })
+
+  it('publishes only when a certain focused re-inspection matches one full transcription', async () => {
+    const extracted = await approvedTranscript()
+    extracted.categories[4].items[1].priceCents = 79
+    const verificationTranscript = structuredClone(extracted)
+    verificationTranscript.categories[4].items[1].priceCents = 179
+    verificationTranscript.categories[4].items[1].uncertain = true
+    verificationTranscript.uncertain = true
+    verificationTranscript.uncertaintyNotes = ['Leading price digit crosses artwork.']
+    const resolutionTranscript = structuredClone(verificationTranscript)
+    resolutionTranscript.categories[4].items[1].uncertain = false
+    resolutionTranscript.uncertain = false
+    resolutionTranscript.uncertaintyNotes = []
+    const importer = createMenuImporter({
+      root: testRoot,
+      dryRun: false,
+      now: () => NOW,
+      fetchFacebook: async () => facebookResult(),
+      extract: async () => structuredClone(extracted),
+      verify: async () => structuredClone(verificationTranscript),
+      resolve: async () => structuredClone(resolutionTranscript),
+    })
+
+    await expect(importer.runFacebook()).resolves.toBe('published')
+    const publication = menuPublicationSchema.parse(
+      JSON.parse(await readFile(path.join(testRoot, 'data/current-menu.json'), 'utf8')),
+    )
+    if (publication.status !== 'ready') throw new Error('Expected a ready publication')
+    expect(publication.menu.categories[4].items[1].priceCents).toBe(179)
+    expect(publication.menu.validation).toEqual({
+      extractedBy: 'gemini-3.6-flash',
+      verifiedBy: 'gemini-3.6-flash:focused-consensus',
+      uncertain: false,
+    })
+  })
+
+  it('keeps a matching focused re-inspection unpublished when it remains uncertain', async () => {
+    const extracted = await approvedTranscript()
+    const verificationTranscript = structuredClone(extracted)
+    verificationTranscript.categories[0].items[0].priceCents += 1
+    const resolutionTranscript = structuredClone(verificationTranscript)
+    resolutionTranscript.categories[0].items[0].uncertain = true
+    resolutionTranscript.uncertain = true
+    resolutionTranscript.uncertaintyNotes = ['The leading digit is still unreadable.']
+    const importer = createMenuImporter({
+      root: testRoot,
+      dryRun: false,
+      now: () => NOW,
+      fetchFacebook: async () => facebookResult(),
+      extract: async () => structuredClone(extracted),
+      verify: async () => structuredClone(verificationTranscript),
+      resolve: async () => structuredClone(resolutionTranscript),
+    })
+
+    await expect(importer.runFacebook()).rejects.toThrow('draft saved')
+    expect(await pathExists(path.join(testRoot, 'data/current-menu.json'))).toBe(false)
   })
 
   it('writes an approved dry-run report without changing publication data', async () => {
@@ -341,6 +408,8 @@ describe('menu import orchestration', () => {
     const extracted = await approvedTranscript()
     const verificationTranscript = structuredClone(extracted)
     verificationTranscript.categories[0].items[0].priceCents += 1
+    const resolutionTranscript = structuredClone(extracted)
+    resolutionTranscript.categories[0].items[0].priceCents += 2
     const reportPath = path.join(testRoot, 'reports', 'rejected.json')
     const importer = createMenuImporter({
       root: testRoot,
@@ -349,6 +418,7 @@ describe('menu import orchestration', () => {
       now: () => NOW,
       extract: async () => structuredClone(extracted),
       verify: async () => structuredClone(verificationTranscript),
+      resolve: async () => structuredClone(resolutionTranscript),
     })
 
     await expect(importer.processImage({

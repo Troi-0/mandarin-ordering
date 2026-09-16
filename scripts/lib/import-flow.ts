@@ -3,8 +3,11 @@ import path from 'node:path'
 import { fetchFacebookMenu, type FacebookPostTarget } from './facebook.ts'
 import {
   comparePriceBenchmark,
+  compareTranscriptData,
   compareTranscriptions,
   extractMenu,
+  resolveMenu,
+  transcriptionHasUncertainty,
   verifyMenu,
   type ExtractedMenu,
   type Verification,
@@ -33,6 +36,7 @@ export interface MenuImporterOptions {
   fetchFacebook?: (target?: FacebookPostTarget) => Promise<FacebookResult>
   extract?: typeof extractMenu
   verify?: typeof verifyMenu
+  resolve?: typeof resolveMenu
 }
 
 export interface ProcessImageOptions {
@@ -44,6 +48,14 @@ export interface ProcessImageOptions {
   publishedAt: string
   method: 'facebook' | 'manual'
   benchmarkReference?: Menu
+}
+
+interface ResolutionEvidence {
+  transcript?: ExtractedMenu
+  certain: boolean
+  agreesWithExtraction: boolean
+  agreesWithVerification: boolean
+  error?: string
 }
 
 export function referenceTranscript(reference: Menu): ExtractedMenu {
@@ -67,6 +79,7 @@ export function createMenuImporter(options: MenuImporterOptions) {
   const facebookFetcher = options.fetchFacebook ?? fetchFacebookMenu
   const extract = options.extract ?? extractMenu
   const verify = options.verify ?? verifyMenu
+  const resolve = options.resolve ?? resolveMenu
 
   function reportPath(): string {
     if (!options.reportPath) {
@@ -81,6 +94,7 @@ export function createMenuImporter(options: MenuImporterOptions) {
     verificationTranscript: ExtractedMenu,
     verification: Verification,
     benchmark?: Verification,
+    resolution?: ResolutionEvidence,
   ): Promise<void> {
     const outputPath = options.dryRun
       ? reportPath()
@@ -97,6 +111,7 @@ export function createMenuImporter(options: MenuImporterOptions) {
         verificationTranscript,
         verification,
         ...(benchmark ? { benchmark } : {}),
+        ...(resolution ? { resolution } : {}),
       }, null, 2)}\n`,
     )
   }
@@ -107,6 +122,8 @@ export function createMenuImporter(options: MenuImporterOptions) {
     verificationTranscript: ExtractedMenu,
     verification: Verification,
     benchmark?: Verification,
+    initialVerification?: Verification,
+    resolution?: ResolutionEvidence,
   ): Promise<void> {
     const outputPath = reportPath()
     await mkdir(path.dirname(outputPath), { recursive: true })
@@ -119,6 +136,8 @@ export function createMenuImporter(options: MenuImporterOptions) {
         verificationTranscript,
         verification,
         ...(benchmark ? { benchmark } : {}),
+        ...(initialVerification ? { initialVerification } : {}),
+        ...(resolution ? { resolution } : {}),
       }, null, 2)}\n`,
     )
   }
@@ -158,24 +177,76 @@ export function createMenuImporter(options: MenuImporterOptions) {
     }
     const extracted = await extract(source.image, source.mimeType)
     const verificationTranscript = await verify(source.image, source.mimeType)
-    const verification = compareTranscriptions(extracted, verificationTranscript)
+    const initialVerification = compareTranscriptions(extracted, verificationTranscript)
     const benchmarkTranscript = source.benchmarkReference
       ? referenceTranscript(source.benchmarkReference)
       : undefined
     const benchmark = benchmarkTranscript
       ? comparePriceBenchmark(extracted, benchmarkTranscript)
       : undefined
+    let approvedTranscript = extracted
+    let verification = initialVerification
+    let resolution: ResolutionEvidence | undefined
+    let usedFocusedConsensus = false
+
+    if (!initialVerification.approved && !benchmark) {
+      try {
+        const transcript = await resolve(source.image, source.mimeType)
+        resolution = {
+          transcript,
+          certain: !transcriptionHasUncertainty(transcript),
+          agreesWithExtraction: compareTranscriptData(transcript, extracted).approved,
+          agreesWithVerification: compareTranscriptData(transcript, verificationTranscript).approved,
+        }
+        if (
+          resolution.certain
+          && (resolution.agreesWithExtraction || resolution.agreesWithVerification)
+        ) {
+          approvedTranscript = transcript
+          verification = { approved: true, uncertain: false, issues: [] }
+          usedFocusedConsensus = true
+          process.stdout.write('Focused re-inspection reached two-pass menu consensus\n')
+        }
+      } catch {
+        resolution = {
+          certain: false,
+          agreesWithExtraction: false,
+          agreesWithVerification: false,
+          error: 'Focused re-inspection request failed',
+        }
+      }
+    }
+
     if (!verification.approved || (benchmark && !benchmark.approved)) {
-      await writeDraft(source, extracted, verificationTranscript, verification, benchmark)
+      await writeDraft(
+        source,
+        extracted,
+        verificationTranscript,
+        initialVerification,
+        benchmark,
+        resolution,
+      )
       throw new Error(
         options.dryRun
           ? `Dry run requires manual review; report saved for ${source.date}`
           : `Menu requires manual review; draft saved for ${source.date}`,
       )
     }
-    const menu = menuFromExtraction({ ...source, extracted })
+    const menu = menuFromExtraction({
+      ...source,
+      extracted: approvedTranscript,
+      verificationMethod: usedFocusedConsensus ? 'focused-consensus' : 'blind-transcription',
+    })
     if (options.dryRun) {
-      await writeApprovedDryRun(menu, extracted, verificationTranscript, verification, benchmark)
+      await writeApprovedDryRun(
+        menu,
+        extracted,
+        verificationTranscript,
+        verification,
+        benchmark,
+        usedFocusedConsensus ? initialVerification : undefined,
+        resolution,
+      )
       const itemCount = menu.categories.reduce((count, category) => count + category.items.length, 0)
       process.stdout.write(
         `Dry run approved ${menu.date}: ${menu.categories.length} categories, ${itemCount} items; nothing published\n`,

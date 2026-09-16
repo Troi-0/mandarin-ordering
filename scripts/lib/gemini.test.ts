@@ -4,12 +4,14 @@ import { menuSchema } from '../../src/lib/menu-schema.ts'
 import {
   assertFreeGeminiConfig,
   comparePriceBenchmark,
+  compareTranscriptData,
   compareTranscriptions,
   extractedMenuSchema,
   GEMINI_BENCHMARK_CONFIGS,
   generateJson,
   normalizeTranscription,
   PRODUCTION_GEMINI_CONFIG,
+  resolveMenu,
   type ExtractedMenu,
 } from './gemini.ts'
 
@@ -148,12 +150,14 @@ describe('blind Gemini transcription comparison', () => {
     const request = JSON.parse(String(fetchMock.mock.calls[0][1]?.body))
     expect(request.generationConfig).toMatchObject({
       thinkingConfig: { thinkingLevel: 'medium' },
-      mediaResolution: 'MEDIA_RESOLUTION_HIGH',
     })
+    expect(request.generationConfig).not.toHaveProperty('mediaResolution')
     expect(request.generationConfig).not.toHaveProperty('temperature')
     expect(request.generationConfig).not.toHaveProperty('topP')
     expect(request.generationConfig).not.toHaveProperty('topK')
-    expect(request.contents[0].parts[1]).not.toHaveProperty('mediaResolution')
+    expect(request.contents[0].parts[1].mediaResolution).toEqual({
+      level: 'MEDIA_RESOLUTION_HIGH',
+    })
   })
 
   it('places ultra-high media resolution on the image part', async () => {
@@ -180,6 +184,26 @@ describe('blind Gemini transcription comparison', () => {
     expect(request.contents[0].parts[1].mediaResolution).toEqual({
       level: 'MEDIA_RESOLUTION_ULTRA_HIGH',
     })
+  })
+
+  it('keeps focused re-inspection independent from disputed candidate values', async () => {
+    vi.stubEnv('GEMINI_API_KEY', 'test-key')
+    const transcript = await humanVerifiedTranscript()
+    const fetchMock = vi.fn(async (
+      _input: string | URL | Request,
+      _init?: RequestInit,
+    ) => new Response(JSON.stringify({
+      candidates: [{ content: { parts: [{ text: JSON.stringify(transcript) }] } }],
+    }), { status: 200 }))
+    vi.stubGlobal('fetch', fetchMock)
+
+    await resolveMenu(new Uint8Array([1]), 'image/jpeg')
+
+    const request = JSON.parse(String(fetchMock.mock.calls[0][1]?.body))
+    const prompt = String(request.contents[0].parts[0].text)
+    expect(prompt).toContain('final independent close inspection')
+    expect(prompt).not.toContain('1.79')
+    expect(prompt).not.toContain('179')
   })
 
   it('keeps every benchmark on an exact free-only model configuration', () => {
@@ -390,6 +414,26 @@ describe('blind Gemini transcription comparison', () => {
       approved: false,
       uncertain: true,
       issues: [],
+    })
+  })
+
+  it('uses uncertainty-free data equality only for focused consensus matching', async () => {
+    const extracted = await humanVerifiedTranscript()
+    const uncertainMatch = structuredClone(extracted)
+    uncertainMatch.uncertain = true
+    uncertainMatch.uncertaintyNotes = ['Artwork crosses one line.']
+    uncertainMatch.categories[0].items[0].uncertain = true
+
+    expect(compareTranscriptData(extracted, uncertainMatch)).toEqual({
+      approved: true,
+      uncertain: false,
+      issues: [],
+    })
+
+    uncertainMatch.categories[0].items[0].priceCents += 1
+    expect(compareTranscriptData(extracted, uncertainMatch)).toMatchObject({
+      approved: false,
+      issues: [expect.objectContaining({ field: 'price' })],
     })
   })
 

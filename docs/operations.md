@@ -42,6 +42,16 @@ and every item-count, portion, or integer-cent price disagreement. Item-name
 spelling and whitespace differences are non-blocking; the extraction name is
 displayed and both raw transcripts remain available in dry-run reports.
 
+When those full-image passes do not approve, the importer makes one final
+focused close inspection of the original pixels, with explicit attention to
+leading price digits and text crossing decorative artwork. It publishes only if
+that focused transcript contains no uncertainty and exactly matches one of the
+two earlier transcripts on categories, item counts, portions, and every price.
+It does not average, infer, or merge conflicting values. A failed, uncertain, or
+third distinct result remains rejected and all available evidence is saved for
+manual review. Benchmark runs intentionally skip this recovery so they continue
+to measure the configured pair of model passes against the human reference.
+
 Once today's menu is ready, later scheduled runs exit before opening Facebook or
 calling Gemini. A changed, fully validated menu is committed to `data/menus/` and
 `data/current-menu.json`. Every successful live run then reconciles publication:
@@ -173,13 +183,16 @@ makes failures inspectable; it does not itself send a proactive alert.
 Run **Import today's Facebook menu** manually from the Actions tab and leave the
 **Run Facebook, Gemini, and validation without publishing anything** checkbox
 selected. This bypasses the already-ready shortcut and exercises the real public
-Facebook retrieval, both Gemini passes, schema checks, and deterministic menu
-invariants. It never commits or replaces menu data.
+Facebook retrieval, both full-image Gemini passes, the conditional focused pass,
+schema checks, and deterministic menu invariants. It never commits or replaces
+menu data.
 
 The run uploads `menu-import-dry-run-<run id>` for three days. An approved report
-contains the candidate menu, both blind transcripts, and their deterministic
-comparison. A rejected report contains both transcripts and the exact disagreement
-list. A rejected dry run intentionally finishes red.
+contains the candidate menu, both full-image transcripts, and their deterministic
+comparison. When focused recovery was needed, the report also includes the
+initial disagreement, focused transcript, certainty flag, and which earlier pass
+it matched. A rejected report contains the available transcripts and exact
+disagreement list. A rejected dry run intentionally finishes red.
 
 To regression-test the model against the original human-verified 43-item menu,
 set **Optional human-verified reference** to `data/menus/2026-08-24.json`. This
@@ -303,8 +316,8 @@ before assuming the importer is at fault.
 ## Failure and cost boundaries
 
 - If Facebook markup becomes unreadable, Gemini is unavailable, the free quota is
-  exhausted, or extraction is uncertain, the workflow fails without replacing the
-  menu.
+  exhausted, or focused consensus cannot safely resolve uncertain extraction, the
+  workflow fails without replacing the menu.
 - Direct Gemini calls retry transient network failures plus 408, 429, and 5xx
   responses at most five times with bounded exponential backoff, jitter, and
   `Retry-After` support. They never switch models or paid service tiers;

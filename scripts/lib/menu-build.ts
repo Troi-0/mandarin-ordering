@@ -15,6 +15,7 @@ export interface MenuBuildOptions {
   image: Uint8Array
   method: 'facebook' | 'manual'
   extracted: ExtractedMenu
+  verificationMethod?: 'blind-transcription' | 'focused-consensus'
 }
 
 export interface ReviewMenu extends Omit<Menu, 'validation'> {
@@ -75,7 +76,7 @@ export function reviewMenuFromExtraction(options: MenuBuildOptions): ReviewMenu 
 export function menuFromExtraction(options: MenuBuildOptions): Menu {
   const menu = menuSchema.parse(menuRecord(options, {
     extractedBy: FREE_GEMINI_MODEL,
-    verifiedBy: `${FREE_GEMINI_MODEL}:blind-transcription`,
+    verifiedBy: `${FREE_GEMINI_MODEL}:${options.verificationMethod ?? 'blind-transcription'}`,
     uncertain: false,
   }))
   assertMenuInvariants(menu)

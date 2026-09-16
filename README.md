@@ -39,8 +39,10 @@ build validation.
   the free tier with billing disabled; there is no paid fallback.
 - Transient Gemini and network failures use bounded exponential backoff with
   jitter and `Retry-After` support before failing closed.
-- Failed or uncertain extraction writes a draft under `data/review/` and never
-  replaces the current menu.
+- If the two full-image passes disagree or flag uncertainty, one focused close
+  inspection may recover the menu only when it is certain and exactly matches
+  one earlier pass on structure, portions, and every price. Otherwise a draft
+  is written under `data/review/` and the current menu is never replaced.
 - A weekday without a menu post is an expected, successful no-op rather than a
   failed run, so a red run keeps meaning that something needs a look.
 - The site itself explains the gap: a weekend rest day, a working morning still
@@ -52,9 +54,10 @@ build validation.
   recover from a failed dispatch or failed deployment. Draft-only and dry-run
   imports never deploy.
 - A manually dispatched Facebook workflow defaults to **dry run**: it bypasses
-  the already-ready shortcut, exercises Facebook and two blind Gemini
-  transcriptions, compares them deterministically, uploads a short-lived report
-  artifact, and never commits or publishes menu data.
+  the already-ready shortcut, exercises Facebook and two independent Gemini
+  transcriptions plus the conditional focused pass, compares them
+  deterministically, uploads a short-lived report artifact, and never commits
+  or publishes menu data.
 - Its optional `data/menus/2026-08-24.json` benchmark replays the historical
   Facebook post and compares all 43 items with the human-verified reference.
 
