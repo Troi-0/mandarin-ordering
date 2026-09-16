@@ -1,5 +1,5 @@
 import { generateKeyPairSync } from 'node:crypto'
-import { cloudflareTest } from '@cloudflare/vitest-pool-workers'
+import { cloudflareTest } from '@cloudflare/vitest-plugin'
 import { defineConfig } from 'vitest/config'
 
 // A throwaway key generated per run: no real or test key material is committed.
