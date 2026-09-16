@@ -1,15 +1,31 @@
 {
+  "$schema": "./node_modules/wrangler/config-schema.json",
   "name": "mandarin-ordering-scheduler",
   "main": "worker.ts",
-  "compatibility_date": "2026-09-04",
+  "compatibility_date": "2026-08-15",
   "workers_dev": false,
   "preview_urls": false,
+  "upload_source_maps": true,
+  "send_metrics": false,
   "triggers": {
-    "crons": ["*/15 5-11 * * MON-FRI"]
+    "crons": ["7,22,37,52 5-11 * * MON-FRI"]
+  },
+  "vars": {
+    "GITHUB_APP_CLIENT_ID": "Iv23liUHHOEU4UuHJX9B",
+    "GITHUB_APP_INSTALLATION_ID": "162291152",
+    "GITHUB_REPOSITORY_ID": "1345231761"
+  },
+  "secrets": {
+    "required": ["GITHUB_APP_PRIVATE_KEY_PKCS8"]
   },
   "observability": {
     "enabled": true,
     "logs": {
+      "enabled": true,
+      "head_sampling_rate": 1,
+      "invocation_logs": true
+    },
+    "traces": {
       "enabled": true,
       "head_sampling_rate": 1
     }

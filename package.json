@@ -6,7 +6,8 @@
   "scripts": {
     "dev": "vite",
     "build": "npm run validate:menus && tsc -b && vite build",
-    "check": "npm run validate:cost && npm run lint && npm run test:coverage && npm run build",
+    "check": "npm run validate:cost && npm run lint && npm run test:coverage && npm run build && npm run check:scheduler",
+    "check:scheduler": "npm --prefix workers/menu-scheduler run check",
     "lint": "oxlint .",
     "preview": "vite preview",
     "test": "vitest run",

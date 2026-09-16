@@ -16,23 +16,26 @@ npm run dev
 ```
 
 Use `npm run check` for the full zero-cost, data, lint, unit-test, and production
-build validation.
+build validation. It also runs the Cloudflare scheduler's own checks, so install
+that package once with `npm ci --prefix workers/menu-scheduler`.
 
 ## Daily import
 
 - `npm run import:facebook` reads the latest public Page post with Playwright.
-- From Monday through Friday, GitHub schedules four off-peak attempts per hour
-  from 08:07 through 11:52 Sofia time because its scheduled events are
-  best-effort and can be dropped.
+- A schedule-only Cloudflare Worker is the authoritative trigger. From Monday
+  through Friday it checks the committed menu, active runs, and the exact Pages
+  deployment every 15 minutes from 08:37 through 13:52 Sofia time, dispatching
+  the importer only when recovery is needed and stopping after three failed
+  imports in a day. It authenticates as a private GitHub App whose one-hour
+  installation tokens are scoped to this repository; the App key is an encrypted
+  Worker secret. See [docs/operations.md](docs/operations.md).
+- GitHub's own schedules, four importer attempts per hour from 08:07 through
+  11:52 Sofia time, remain during the Worker's proof period. They are
+  best-effort and have been arriving hours late.
 - A separate UTC-scheduled watchdog checks the committed menu without Facebook,
   Playwright, Gemini, or its API key. If today's plausible menu is missing during
   its cron-defined Sofia ordering window, it retries dispatching the production
   importer even when GitHub starts the watchdog late.
-- A schedule-only Cloudflare Worker provides an external free fallback. It
-  checks the authoritative menu, active import, and exact Pages deployment every
-  15 minutes during the Sofia lunch window, dispatching the importer only when
-  recovery is needed. Its repository-scoped GitHub token is stored as an
-  encrypted Worker secret; see [docs/operations.md](docs/operations.md).
 - `npm run import:manual -- manual-inbox/YYYY-MM-DD.png` processes a manually
   uploaded image.
 - Both commands require `GEMINI_API_KEY`. The Google AI project must remain on

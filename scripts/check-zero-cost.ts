@@ -9,11 +9,14 @@ import {
 } from './lib/gemini.ts'
 
 const root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..')
-const packageJson = JSON.parse(await readFile(path.join(root, 'package.json'), 'utf8')) as {
-  dependencies?: Record<string, string>
-  devDependencies?: Record<string, string>
+const packages: string[] = []
+for (const manifest of ['package.json', 'workers/menu-scheduler/package.json']) {
+  const packageJson = JSON.parse(await readFile(path.join(root, manifest), 'utf8')) as {
+    dependencies?: Record<string, string>
+    devDependencies?: Record<string, string>
+  }
+  packages.push(...Object.keys({ ...packageJson.dependencies, ...packageJson.devDependencies }))
 }
-const packages = Object.keys({ ...packageJson.dependencies, ...packageJson.devDependencies })
 const forbiddenPackages = /stripe|openai|firebase|supabase|segment|mixpanel|amplitude|sentry|posthog/i
 const forbidden = packages.filter((name) => forbiddenPackages.test(name))
 if (forbidden.length) throw new Error(`Cost boundary: forbidden packages found: ${forbidden.join(', ')}`)
