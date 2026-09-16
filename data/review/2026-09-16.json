@@ -12,7 +12,7 @@
       "publishedAt": "2026-09-16T05:30:05.000Z",
       "imageSha256": "d2e15d63ce0a2039a7986bf0911b993615a9832721edd6718ce509c8ddff9d5b"
     },
-    "importedAt": "2026-09-16T09:56:00.574Z",
+    "importedAt": "2026-09-16T11:26:36.951Z",
     "importMethod": "facebook",
     "validation": {
       "extractedBy": "gemini-3.6-flash",
@@ -55,8 +55,8 @@
             "priceCents": 510
           },
           {
-            "id": "item-20fd74802f36",
-            "name": "Дърпано пуешко филе със сушени домати и зеленчуци, в хрупкава тортила с гарнитура",
+            "id": "item-3896894f2c75",
+            "name": "Дърпано пуешко филе със сушени домати и зеленчуци, в хрупкава тортиля с гарнитура",
             "portion": "350 г",
             "priceCents": 590
           },
@@ -231,8 +231,8 @@
             "priceCents": 302
           },
           {
-            "id": "item-816f7e22b715",
-            "name": "Сала Капрезе/с моцарела и песто /единично опакована/",
+            "id": "item-16f66c309b21",
+            "name": "Сала Капрезе/с моцарела и песто",
             "portion": "300 г",
             "priceCents": 450
           },
@@ -307,8 +307,11 @@
     ]
   },
   "extracted": {
-    "uncertain": false,
-    "uncertaintyNotes": [],
+    "uncertain": true,
+    "uncertaintyNotes": [
+      "The price for 'Мляко с ориз и канела' in ДЕСЕРТ is partially obscured by decorative graphics.",
+      "The text for 'Сала Капрезе/с моцарела и песто' in САЛАТИ is partially overlapped by background artwork."
+    ],
     "categories": [
       {
         "name": "СУПИ",
@@ -343,7 +346,7 @@
             "uncertain": false
           },
           {
-            "name": "Дърпано пуешко филе със сушени домати и зеленчуци, в хрупкава тортила с гарнитура",
+            "name": "Дърпано пуешко филе със сушени домати и зеленчуци, в хрупкава тортиля с гарнитура",
             "portion": "350 г",
             "priceCents": 590,
             "uncertain": false
@@ -493,7 +496,7 @@
             "name": "Мляко с ориз и канела",
             "portion": null,
             "priceCents": 79,
-            "uncertain": false
+            "uncertain": true
           },
           {
             "name": "Протеинов шоколадов мус",
@@ -519,10 +522,10 @@
             "uncertain": false
           },
           {
-            "name": "Сала Капрезе/с моцарела и песто /единично опакована/",
+            "name": "Сала Капрезе/с моцарела и песто",
             "portion": "300 г",
             "priceCents": 450,
-            "uncertain": false
+            "uncertain": true
           },
           {
             "name": "Салата от краставици, репички, царевица и сирене",
@@ -595,8 +598,10 @@
     ]
   },
   "verificationTranscript": {
-    "uncertain": false,
-    "uncertaintyNotes": [],
+    "uncertain": true,
+    "uncertaintyNotes": [
+      "Leading digit in price for dessert item 2 (Мляко с ориз и канела) is partially obscured by the background design element."
+    ],
     "categories": [
       {
         "name": "СУПИ",
@@ -781,7 +786,7 @@
             "name": "Мляко с ориз и канела",
             "portion": null,
             "priceCents": 179,
-            "uncertain": false
+            "uncertain": true
           },
           {
             "name": "Протеинов шоколадов мус",
@@ -807,7 +812,7 @@
             "uncertain": false
           },
           {
-            "name": "Сала Капрезе/с моцарела и песто /единично опакована/",
+            "name": "Сала Капрезе/с моцарела и песто",
             "portion": "300 г",
             "priceCents": 450,
             "uncertain": false
@@ -884,7 +889,7 @@
   },
   "verification": {
     "approved": false,
-    "uncertain": false,
+    "uncertain": true,
     "issues": [
       {
         "category": "ДЕСЕРТ",
