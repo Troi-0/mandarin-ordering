@@ -28,6 +28,28 @@ if (PRODUCTION_GEMINI_CONFIG.model.includes('latest')) {
   throw new Error('Cost boundary: production must pin an exact stable Gemini model')
 }
 
+// The scheduler Worker runs on Workers Free. Allow only configuration that Free
+// supports without a payment method: no bindings, routes, Logpush, configurable
+// limits, or extra triggers. A new key must be reviewed for cost before it is added.
+const FREE_SCHEDULER_KEYS = new Set([
+  '$schema', 'name', 'main', 'compatibility_date', 'workers_dev', 'preview_urls',
+  'upload_source_maps', 'send_metrics', 'triggers', 'vars', 'secrets', 'observability',
+])
+const schedulerConfig = JSON.parse(
+  await readFile(path.join(root, 'workers/menu-scheduler/wrangler.json'), 'utf8'),
+) as Record<string, unknown>
+const paidSchedulerKeys = Object.keys(schedulerConfig).filter((key) => !FREE_SCHEDULER_KEYS.has(key))
+if (paidSchedulerKeys.length) {
+  throw new Error(`Cost boundary: scheduler Worker config uses unreviewed keys: ${paidSchedulerKeys.join(', ')}`)
+}
+const triggers = schedulerConfig.triggers as Record<string, unknown> | undefined
+if (!triggers || Object.keys(triggers).join() !== 'crons' || !Array.isArray(triggers.crons) || triggers.crons.length !== 1) {
+  throw new Error('Cost boundary: the scheduler Worker must use exactly one Cron Trigger and nothing else')
+}
+if (schedulerConfig.workers_dev !== false || schedulerConfig.preview_urls !== false) {
+  throw new Error('Cost boundary: the scheduler Worker must not expose workers.dev or preview URLs')
+}
+
 const sourceFiles = ['index.html', 'src/App.tsx', 'src/styles.css', 'src/lib/menu-schema.ts']
 const forbiddenRuntime = /google-analytics|googletagmanager|fonts\.googleapis|stripe\.com|sentry\.io|api\.openai\.com/i
 for (const filename of sourceFiles) {
