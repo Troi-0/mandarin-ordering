@@ -7,7 +7,10 @@ const GITHUB_API = 'https://api.github.com'
 const API_VERSION = '2026-03-10'
 const SOFIA_TIME_ZONE = 'Europe/Sofia'
 const ACTIVE_RUN_STATUSES = new Set(['queued', 'in_progress', 'waiting', 'pending', 'requested'])
-const FAILED_CONCLUSIONS = new Set(['failure', 'timed_out', 'startup_failure'])
+// Only genuine importer failures count. The menu-import concurrency group
+// cancels superseded pending runs as a matter of course, so a cancellation there
+// is not evidence that importing is broken.
+const FAILED_IMPORT_CONCLUSIONS = new Set(['failure', 'timed_out', 'startup_failure'])
 const REQUEST_TIMEOUT_MS = 15_000
 // Every archived menu was posted at 08:30:0x Sofia, so an earlier dispatch can
 // only report that no post exists yet.
@@ -18,8 +21,11 @@ const WINDOW_CLOSES_AT_MINUTE = 14 * 60
 export const MAX_FAILED_IMPORTS_PER_DAY = 3
 // Recovering a missing Pages deployment never scrapes or transcribes: the
 // importer sees today's ready menu and only reconciles. It therefore keeps its
-// own budget after imports are exhausted, bounded by failed Pages runs and a
-// hard ceiling on importer failures so a broken deploy cannot loop all day.
+// own budget after imports are exhausted, bounded by unsuccessful Pages runs and
+// a hard ceiling on importer failures so the Worker cannot retry a broken deploy
+// all day. Pages cancels in-progress runs, so every completed run that did not
+// succeed spends this budget, cancellations included. The budget limits only
+// this Worker: importer runs started elsewhere still reconcile Pages themselves.
 export const MAX_FAILED_PAGES_RUNS_PER_DAY = 3
 export const MAX_FAILED_IMPORTS_FOR_PAGES_RECOVERY = 6
 const TOKEN_PERMISSIONS = { actions: 'write', contents: 'read' } as const
@@ -333,21 +339,28 @@ async function activeWorkflowRuns(workflow: string, token: string, fetchImpl: ty
   return results.flat()
 }
 
-async function failedRunsToday(
+async function completedRunsToday(
   workflow: string,
   now: Date,
   token: string,
   fetchImpl: typeof fetch,
-): Promise<number> {
+): Promise<WorkflowRun[]> {
   const clock = sofiaClock(now)
   // The offset at the current time equals midnight's on every weekday; Sofia
   // changes offset only on Sunday nights, outside the recovery window.
-  const runs = await listRuns(runsPath(workflow, {
+  return listRuns(runsPath(workflow, {
     status: 'completed',
     created: `>=${clock.date}T00:00:00${clock.offset}`,
     per_page: '100',
   }), token, fetchImpl)
-  return runs.filter((run) => typeof run.conclusion === 'string' && FAILED_CONCLUSIONS.has(run.conclusion)).length
+}
+
+function countFailedImports(runs: WorkflowRun[]): number {
+  return runs.filter((run) => typeof run.conclusion === 'string' && FAILED_IMPORT_CONCLUSIONS.has(run.conclusion)).length
+}
+
+function countUnsuccessfulPagesRuns(runs: WorkflowRun[]): number {
+  return runs.filter((run) => run.conclusion !== 'success').length
 }
 
 export async function checkAndRecover(
@@ -387,8 +400,8 @@ export async function checkAndRecover(
     activeWorkflowRuns(IMPORT_WORKFLOW, token, fetchImpl),
     activeWorkflowRuns(PAGES_WORKFLOW, token, fetchImpl),
     listRuns(runsPath(PAGES_WORKFLOW, { status: 'success', head_sha: headSha, per_page: '1' }), token, fetchImpl),
-    failedRunsToday(IMPORT_WORKFLOW, now, token, fetchImpl),
-    failedRunsToday(PAGES_WORKFLOW, now, token, fetchImpl),
+    completedRunsToday(IMPORT_WORKFLOW, now, token, fetchImpl).then(countFailedImports),
+    completedRunsToday(PAGES_WORKFLOW, now, token, fetchImpl).then(countUnsuccessfulPagesRuns),
   ])
 
   const decision = evaluateRecovery({

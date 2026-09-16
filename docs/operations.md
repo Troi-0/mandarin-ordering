@@ -111,20 +111,34 @@ Inside it:
 | `import-active` / `pages-active` | Work already in progress; nothing dispatched. |
 | `ready` | Today's plausible menu is on a commit with a successful exact-SHA Pages run. |
 | `attempts-exhausted` | Today's menu is missing and three importer runs failed, timed out, or failed to start today. The Worker stops importing so a persistent Facebook or OCR failure cannot turn into an all-day storm of Playwright scrapes, free Gemini calls, and review-draft commits. Fix the cause, then dispatch the importer manually. |
-| `pages-attempts-exhausted` | Today's menu is ready but its exact commit has no successful Pages run, and either three Pages runs or six importer runs failed today. Look at the Pages workflow, then dispatch it or the importer manually. |
+| `pages-attempts-exhausted` | Today's menu is ready but its exact commit has no successful Pages run, and either three Pages runs ended without success or six importer runs failed today. Look at the Pages workflow, then dispatch it or the importer manually. |
 | `stale` / `pages-missing` | The importer is dispatched once with `{"ref":"master","inputs":{"dry_run":"false"}}`; the Worker validates and logs the returned run URL. |
 
 The two budgets are separate on purpose. A `pages-missing` dispatch never reaches
 Facebook or Gemini: the importer sees today's ready menu and only reconciles Pages.
 So a morning of failed imports does not stop the Worker from redeploying a menu
 that a maintainer or a backup run published later. That recovery is still bounded
-by failed Pages runs and a ceiling of six failed importer runs, so a broken Pages
-build or reconcile step cannot loop all day. The watchdog only checks menu
-freshness, which is why this recovery has to live in the Worker.
+by unsuccessful Pages runs and a ceiling of six failed importer runs, so the Worker
+cannot keep retrying a broken Pages build or reconcile step all day. The watchdog
+only checks menu freshness, which is why this recovery has to live in the Worker.
 
-The failure counts include every run on `master` today, including a maintainer's
-failed dry runs. A day spent debugging with dry runs can therefore also stop
-automatic dispatch; dispatch manually after the fix.
+The two budgets count differently. An importer run counts only when it failed,
+timed out, or failed to start: the `menu-import` concurrency group routinely
+cancels superseded pending runs, which says nothing about importing being broken.
+A Pages run counts whenever it completed without success, cancellations included.
+Pages uses `cancel-in-progress`, so a stream of superseded deployments would
+otherwise never spend the budget. On a day of rapid site pushes, cancelled
+deployments can therefore exhaust it early; the push that follows still deploys.
+
+Both counts include every run on `master` today, including a maintainer's failed
+dry runs. A day spent debugging with dry runs can therefore also stop automatic
+dispatch; dispatch manually after the fix.
+
+These budgets limit only the Worker's own dispatches. Any importer run started
+elsewhere, including GitHub's native schedule until the cutover removes it,
+manual runs, watchdog dispatches, and manual-inbox imports, still reconciles Pages
+on its own. GitHub's schedule has been creating about one run per weekday, so
+that adds at most a late extra reconcile, not a loop.
 
 The dispatch contract uses `X-GitHub-Api-Version: 2026-03-10`. A successful
 response is HTTP 200 with `workflow_run_id` and `html_url`. Dispatch is not retried

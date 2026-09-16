@@ -459,6 +459,43 @@ describe('menu recovery against GitHub', () => {
     expect(calls(exhausted).some(({ url }) => url.href === DISPATCH_URL)).toBe(false)
   })
 
+  it('spends the Pages budget on cancelled runs, which cancel-in-progress produces', async () => {
+    const fetchMock = github({
+      pagesRuns: [],
+      completedPages: Array.from({ length: 3 }, () => ({ status: 'completed', conclusion: 'cancelled' })),
+    })
+    await expect(checkAndRecover(FRIDAY_MORNING, env(), fetchMock))
+      .resolves.toMatchObject({ dispatch: false, reason: 'pages-attempts-exhausted' })
+    expect(calls(fetchMock).some(({ url }) => url.href === DISPATCH_URL)).toBe(false)
+  })
+
+  it.each(['action_required', 'stale', 'neutral', 'skipped', null])(
+    'counts a completed %s Pages run as unsuccessful', async (conclusion) => {
+      const fetchMock = github({
+        pagesRuns: [],
+        completedPages: [
+          { status: 'completed', conclusion: 'failure' },
+          { status: 'completed', conclusion: 'cancelled' },
+          { status: 'completed', conclusion },
+          { status: 'completed', conclusion: 'success' },
+        ],
+      })
+      await expect(checkAndRecover(FRIDAY_MORNING, env(), fetchMock))
+        .resolves.toMatchObject({ dispatch: false, reason: 'pages-attempts-exhausted' })
+    },
+  )
+
+  it('does not treat cancelled or other non-failure importer runs as failed imports', async () => {
+    const fetchMock = github({
+      menu: publication('2026-09-03'),
+      completedImports: ['cancelled', 'cancelled', 'cancelled', 'action_required', 'skipped']
+        .map((conclusion) => ({ status: 'completed', conclusion })),
+      dispatch: response({ workflow_run_id: 123, html_url: RUN_URL }),
+    })
+    await expect(checkAndRecover(FRIDAY_MORNING, env(), fetchMock))
+      .resolves.toMatchObject({ dispatch: true, reason: 'stale' })
+  })
+
   it('surfaces a failed dispatch for Cloudflare observability', async () => {
     const fetchMock = github({ menu: publication('2026-09-03'), dispatch: response({ message: 'forbidden' }, 403) })
     await expect(checkAndRecover(FRIDAY_MORNING, env(), fetchMock)).rejects.toThrow('workflow dispatch failed with 403')
