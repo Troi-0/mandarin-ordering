@@ -1,21 +1,21 @@
 {
   "status": "ready",
   "menu": {
-    "date": "2026-09-16",
+    "date": "2026-09-17",
     "restaurant": "Mandarin House",
     "currency": "EUR",
     "source": {
       "pageId": "100063668642218",
-      "postId": "1720968113368794",
-      "postUrl": "https://www.facebook.com/permalink.php?story_fbid=1720968113368794&id=100063668642218",
-      "publishedAt": "2026-09-16T05:30:05.000Z",
-      "imageSha256": "d2e15d63ce0a2039a7986bf0911b993615a9832721edd6718ce509c8ddff9d5b"
+      "postId": "1721954666603472",
+      "postUrl": "https://www.facebook.com/permalink.php?story_fbid=1721954666603472&id=100063668642218",
+      "publishedAt": "2026-09-17T05:30:05.000Z",
+      "imageSha256": "15acdc32598bdd7119f57a8633aa532897ecc0caca32c3b9dbf069403dc0655c"
     },
-    "importedAt": "2026-09-16T14:39:31.801Z",
+    "importedAt": "2026-09-17T05:55:05.095Z",
     "importMethod": "facebook",
     "validation": {
       "extractedBy": "gemini-3.6-flash",
-      "verifiedBy": "gemini-3.6-flash:focused-consensus",
+      "verifiedBy": "gemini-3.6-flash:blind-transcription",
       "uncertain": false
     },
     "categories": [
@@ -24,14 +24,14 @@
         "name": "СУПИ",
         "items": [
           {
-            "id": "item-7b22a221ab65",
-            "name": "Пуешка супа по селски",
+            "id": "item-e48f36f49572",
+            "name": "Телешко варено",
             "portion": "350 мл",
-            "priceCents": 270
+            "priceCents": 300
           },
           {
-            "id": "item-edcee740cc30",
-            "name": "Спаначена крем супа",
+            "id": "item-27382c42c153",
+            "name": "Гъбена крем супа",
             "portion": "350 мл",
             "priceCents": 250
           },
@@ -48,64 +48,64 @@
         "name": "ОСНОВНИ",
         "items": [
           {
-            "id": "item-fbe7609af877",
-            "name": "Панирано пилешко филе с корнфлейкс, с гарнитура",
+            "id": "item-67617dc04031",
+            "name": "Пилешко филе с гъбен сос, с гарнитура",
             "portion": "350 г",
             "priceCents": 510
           },
           {
-            "id": "item-20fd74802f36",
-            "name": "Дърпано пуешко филе със сушени домати и зеленчуци, в хрупкава тортила с гарнитура",
+            "id": "item-d0ce10933926",
+            "name": "Порция пилешки гирос, с ½ пърленка, тирокафтери и гарнитура",
             "portion": "350 г",
             "priceCents": 590
           },
           {
-            "id": "item-ad8c49fd7782",
-            "name": "Свински мръвки с лук и гъби, с гарнитура",
+            "id": "item-0810d9afcc1a",
+            "name": "Винен кебап от свинска мръвка, с гарнитура ориз или картофено пюре",
             "portion": "350 г",
-            "priceCents": 490
+            "priceCents": 480
           },
           {
-            "id": "item-01d578dc3245",
-            "name": "Карета от свинско контра филе на плоча, с гарнитура",
+            "id": "item-36075f088beb",
+            "name": "Агнешка дроб - сарма",
             "portion": "350 г",
-            "priceCents": 510
+            "priceCents": 480
           },
           {
-            "id": "item-ad1126ec566b",
-            "name": "Лазаня Болонезе",
+            "id": "item-405b1abf3a19",
+            "name": "Мусака по гръцки с патладжан",
             "portion": "350 г",
-            "priceCents": 470
+            "priceCents": 480
           },
           {
-            "id": "item-97d24d3e1b5d",
-            "name": "Гнездо от мляно месо с бекон, моцарела и яйце, с гарнитура",
+            "id": "item-0a8b15e7199e",
+            "name": "Пълнени чушки с кайма и ориз",
             "portion": "350 г",
-            "priceCents": 460
+            "priceCents": 450
           },
           {
-            "id": "item-be01d35003fd",
-            "name": "Кашкавал пане, с гарнитура",
+            "id": "item-dea8963710b3",
+            "name": "Спаначено руло с филаделфия и сушени домати, с гарнитура",
             "portion": "350 г",
-            "priceCents": 510
+            "priceCents": 480
           },
           {
-            "id": "item-f7218f871eac",
-            "name": "Лятна селска манджа",
+            "id": "item-f6c3b1507ae2",
+            "name": "Яйца на очи върху картофено пюре със сирене",
             "portion": "350 г",
-            "priceCents": 420
+            "priceCents": 430
           },
           {
-            "id": "item-0e22cd9cfb79",
-            "name": "Грах яхния",
+            "id": "item-e2cb876c0119",
+            "name": "Постни лозови сармички",
             "portion": "350 г",
-            "priceCents": 380
+            "priceCents": 430
           },
           {
-            "id": "item-c991e7cd4768",
-            "name": "Кюфтета от риба тон, с бадемова коричка, с гарнитура",
+            "id": "item-1703531da27b",
+            "name": "Пъстърва на скара /цяла/, с гарнитура",
             "portion": "350 г",
-            "priceCents": 780
+            "priceCents": 760
           }
         ]
       },
@@ -198,9 +198,9 @@
         "name": "ДЕСЕРТ",
         "items": [
           {
-            "id": "item-588afab27bcf",
-            "name": "Бискофф торта",
-            "priceCents": 310
+            "id": "item-9f4aad598d6a",
+            "name": "Торта линдт с малина",
+            "priceCents": 350
           },
           {
             "id": "item-42a2892ed603",
@@ -216,6 +216,11 @@
             "id": "item-0d54f91b36c6",
             "name": "Млечен пудинг с чиа и плодове",
             "priceCents": 205
+          },
+          {
+            "id": "item-99af9780356d",
+            "name": "Крем карамел",
+            "priceCents": 200
           }
         ]
       },
@@ -230,8 +235,8 @@
             "priceCents": 302
           },
           {
-            "id": "item-2d176d191330",
-            "name": "Сала Капрезе с моцарела и песто/единично опакована/",
+            "id": "item-ee8b5667cb46",
+            "name": "Сала Капрезе с моцарела и песто /единично опакована/",
             "portion": "300 г",
             "priceCents": 450
           },
