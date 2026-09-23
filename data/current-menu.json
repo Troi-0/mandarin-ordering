@@ -1,17 +1,17 @@
 {
   "status": "ready",
   "menu": {
-    "date": "2026-09-21",
+    "date": "2026-09-23",
     "restaurant": "Mandarin House",
     "currency": "EUR",
     "source": {
       "pageId": "100063668642218",
-      "postId": "1726034759528796",
-      "postUrl": "https://www.facebook.com/permalink.php?story_fbid=1726034759528796&id=100063668642218",
-      "publishedAt": "2026-09-21T05:30:02.000Z",
-      "imageSha256": "de01ca04492ea4b533a9ab82644af2f5626140d11214b094c9bb7d97067e5723"
+      "postId": "1728167135982225",
+      "postUrl": "https://www.facebook.com/permalink.php?story_fbid=1728167135982225&id=100063668642218",
+      "publishedAt": "2026-09-23T05:30:04.000Z",
+      "imageSha256": "fa3c14260ee9287dbb4b1cf8da864b449ea0ddd7c654e17d5ffc19c5f0d3ee36"
     },
-    "importedAt": "2026-09-21T05:39:50.342Z",
+    "importedAt": "2026-09-23T05:43:53.742Z",
     "importMethod": "facebook",
     "validation": {
       "extractedBy": "gemini-3.6-flash",
@@ -24,16 +24,16 @@
         "name": "СУПИ",
         "items": [
           {
-            "id": "item-90f46ff10ead",
-            "name": "Пилешка",
+            "id": "item-0fcacf796615",
+            "name": "Супа топчета",
             "portion": "350 мл",
             "priceCents": 270
           },
           {
-            "id": "item-d39ba4442c0a",
-            "name": "Крем супа от червена леща",
+            "id": "item-3e7e1717b9cd",
+            "name": "Фалшиво шкембе с кладница",
             "portion": "350 мл",
-            "priceCents": 250
+            "priceCents": 280
           },
           {
             "id": "item-27bd3994ec83",
@@ -48,69 +48,117 @@
         "name": "ОСНОВНИ",
         "items": [
           {
-            "id": "item-1c4c0e57423c",
-            "name": "Запечено пилешко бутче с ориз на фурна",
-            "portion": "350 г",
-            "priceCents": 490
-          },
-          {
-            "id": "item-31ef6f2c5264",
-            "name": "Панирано пилешко филе Панко, с гарнитура",
+            "id": "item-9efd5408cb5d",
+            "name": "Късчета от пилешко филе с триаки сос и гарнитура ориз",
             "portion": "350 г",
             "priceCents": 510
           },
           {
-            "id": "item-1c26bcf5585d",
-            "name": "Свинско джоланче с картофено пюре",
-            "portion": "350 г",
-            "priceCents": 490
-          },
-          {
-            "id": "item-9983c4aa1bbe",
-            "name": "Шпикован свински врат, с гарнитура",
+            "id": "item-c38e9551d7ed",
+            "name": "Панирано пилешко филе с пармезан, с гарнитура",
             "portion": "350 г",
             "priceCents": 510
           },
           {
-            "id": "item-cd348a8e10b7",
-            "name": "Мусака с мляно месо, тиквички и ориз",
+            "id": "item-1383a1675e50",
+            "name": "Свинско джоланче с бирени картофки на фурна",
             "portion": "350 г",
-            "priceCents": 450
+            "priceCents": 490
           },
           {
-            "id": "item-d72d91441773",
-            "name": "Телешки бифтек с яйце, ½ пърленка и гарнитура",
+            "id": "item-eef1df3e76db",
+            "name": "Пълнено свинско контра филе с бекон и моцарела, с гарнитура",
             "portion": "350 г",
-            "priceCents": 580
+            "priceCents": 520
           },
           {
-            "id": "item-f61c7676ddb3",
-            "name": "Кюфтета от броколи с моцарела, с млечен сос и гарнитура",
+            "id": "item-da0596201b2c",
+            "name": "Шницел от мляно месо с кашкавал, на фурна, с гарнитура",
+            "portion": "350 г",
+            "priceCents": 480
+          },
+          {
+            "id": "item-5b77f3b1a0a6",
+            "name": "Адана кебап от телешко и агнешко /2бр/ на скара, ½ пърленка, салата табуле и гарнитура",
+            "portion": "350 г",
+            "priceCents": 640
+          },
+          {
+            "id": "item-f236aadae8e2",
+            "name": "Картофени кюфтета, с млечен сос и гарнитура",
             "portion": "350 г",
             "priceCents": 440
           },
           {
-            "id": "item-513ede6a701d",
-            "name": "Сирене по шопски",
+            "id": "item-de4a97e142d8",
+            "name": "Суфле от кашкавал на фурна, с гарнитура",
             "portion": "350 г",
-            "priceCents": 410
+            "priceCents": 490
           },
           {
-            "id": "item-2e654e495fa8",
-            "name": "Спанак с ориз и домати на фурна",
+            "id": "item-4a47ffc31411",
+            "name": "Леща яхния",
             "portion": "350 г",
             "priceCents": 400
           },
           {
-            "id": "item-a3b68d6c6fec",
-            "name": "Филе от сьомга с билки, с гарнитура",
+            "id": "item-c7f059b88bf3",
+            "name": "Ципура на скара /цяла/, с гарнитура",
             "portion": "350 г",
-            "priceCents": 790
+            "priceCents": 860
           }
         ]
       },
       {
-        "id": "category-555b3b7f7252",
+        "id": "category-93e781090211",
+        "name": "СКАРА",
+        "items": [
+          {
+            "id": "item-305d84418e80",
+            "name": "Мариновани свински ребърца на скара",
+            "portion": "200 г",
+            "priceCents": 360
+          },
+          {
+            "id": "item-f616d12ef63e",
+            "name": "Кралски котлет с цяло ребро на скара",
+            "portion": "300 г",
+            "priceCents": 660
+          },
+          {
+            "id": "item-6df823c8aaff",
+            "name": "Пилешко филе на скара",
+            "portion": "130 г",
+            "priceCents": 330
+          },
+          {
+            "id": "item-727d5e7d3b97",
+            "name": "Пържола от пилешко бутче на скара",
+            "portion": "150 г",
+            "priceCents": 340
+          },
+          {
+            "id": "item-addc822868b7",
+            "name": "Шишче от пилешко филе със зеленчуци",
+            "portion": "100 г",
+            "priceCents": 190
+          },
+          {
+            "id": "item-f2baea0819ee",
+            "name": "Кюфте/Кебапче на скара",
+            "portion": "100 г",
+            "priceCents": 120
+          },
+          {
+            "id": "item-288472690313",
+            "name": "Домашен конски суджук на скара",
+            "portion": "200 г",
+            "priceCents": 470
+          }
+        ]
+      },
+      {
+        "id": "category-07157351ae13",
         "name": "ГАРНИТУРИ",
         "items": [
           {
@@ -146,74 +194,31 @@
         ]
       },
       {
-        "id": "category-5f5514c54a21",
-        "name": "СКАРА",
-        "items": [
-          {
-            "id": "item-305d84418e80",
-            "name": "Мариновани свински ребърца на скара",
-            "portion": "200 г",
-            "priceCents": 348
-          },
-          {
-            "id": "item-f616d12ef63e",
-            "name": "Кралски котлет с цяло ребро на скара",
-            "portion": "300 г",
-            "priceCents": 660
-          },
-          {
-            "id": "item-6df823c8aaff",
-            "name": "Пилешко филе на скара",
-            "portion": "130 г",
-            "priceCents": 302
-          },
-          {
-            "id": "item-727d5e7d3b97",
-            "name": "Пържола от пилешко бутче на скара",
-            "portion": "150 г",
-            "priceCents": 307
-          },
-          {
-            "id": "item-addc822868b7",
-            "name": "Шишче от пилешко филе със зеленчуци",
-            "portion": "100 г",
-            "priceCents": 179
-          },
-          {
-            "id": "item-f2baea0819ee",
-            "name": "Кюфте/Кебапче на скара",
-            "portion": "100 г",
-            "priceCents": 112
-          },
-          {
-            "id": "item-288472690313",
-            "name": "Домашен конски суджук на скара",
-            "portion": "200 г",
-            "priceCents": 455
-          }
-        ]
-      },
-      {
         "id": "category-2069b35e18f8",
         "name": "ДЕСЕРТ",
         "items": [
           {
-            "id": "item-b695501b06da",
-            "name": "Макарони на фурна",
-            "priceCents": 180
+            "id": "item-bcb056b2d923",
+            "name": "Веган торта с натурален шоколад и плодове",
+            "priceCents": 310
           },
           {
-            "id": "item-42a2892ed603",
+            "id": "item-25ac4d962aef",
+            "name": "Торта мак и кокос с ягоди и бял шоколад",
+            "priceCents": 310
+          },
+          {
+            "id": "item-8f0b7d691665",
             "name": "Мляко с ориз и канела",
             "priceCents": 179
           },
           {
-            "id": "item-a4dd1fc8487a",
+            "id": "item-f6862696c86d",
             "name": "Протеинов шоколадов мус",
             "priceCents": 290
           },
           {
-            "id": "item-0d54f91b36c6",
+            "id": "item-402baa5c0005",
             "name": "Млечен пудинг с чиа и плодове",
             "priceCents": 205
           }
