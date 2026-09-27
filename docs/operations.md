@@ -22,18 +22,10 @@ selections, or browser data.
 
 From Monday through Friday, the [Cloudflare scheduler](#cloudflare-scheduler)
 checks every 15 minutes from 08:37 through 13:52 Sofia time and dispatches the
-importer when today's menu or its Pages deployment is missing. Until its proof
-period ends, GitHub's own schedules remain as fallbacks. The importer workflow is
-scheduled at 08:07, 08:22, 08:37, and 08:52, repeating that staggered cadence
-through 11:52 in the `Europe/Sofia` timezone, although GitHub has been creating
-about one of those runs per weekday, hours late. A second workflow uses a separate
-UTC schedule at minutes 13, 33, and 53 from 06:00 through 09:59 UTC. This maps to
-09:13-12:53 in summer and 08:13-11:53 in winter. The cron itself defines the
-recovery window: a runner that GitHub starts late still checks today's Sofia date
-and can recover a stale menu instead of exiting successfully without dispatching.
-This watchdog only reads and sanity-checks `data/current-menu.json`; it has no
-Gemini key and does not install Playwright. When today's plausible menu is
-missing, it retries dispatching the production importer up to three times. The
+importer when today's menu or its Pages deployment is missing. Cloudflare is the
+sole daily scheduler: the importer has no GitHub `schedule`, and the separate
+GitHub watchdog has been removed. The Facebook importer remains callable through
+`workflow_dispatch`, including manual dry runs and live recovery. The
 importer parses Facebook's embedded JSON and accepts an image
 only when the same structured post record directly owns the post ID, creation
 time, Mandarin House Page author, and one unambiguous Facebook CDN attachment.
@@ -119,8 +111,8 @@ Facebook or Gemini: the importer sees today's ready menu and only reconciles Pag
 So a morning of failed imports does not stop the Worker from redeploying a menu
 that a maintainer or a backup run published later. That recovery is still bounded
 by unsuccessful Pages runs and a ceiling of six failed importer runs, so the Worker
-cannot keep retrying a broken Pages build or reconcile step all day. The watchdog
-only checks menu freshness, which is why this recovery has to live in the Worker.
+cannot keep retrying a broken Pages build or reconcile step all day. Both menu
+freshness and exact-commit publication recovery live in the Worker.
 
 The two budgets count differently. An importer run counts only when it failed,
 timed out, or failed to start: the `menu-import` concurrency group routinely
@@ -134,11 +126,9 @@ Both counts include every run on `master` today, including a maintainer's failed
 dry runs. A day spent debugging with dry runs can therefore also stop automatic
 dispatch; dispatch manually after the fix.
 
-These budgets limit only the Worker's own dispatches. Any importer run started
-elsewhere, including GitHub's native schedule until the cutover removes it,
-manual runs, watchdog dispatches, and manual-inbox imports, still reconciles Pages
-on its own. GitHub's schedule has been creating about one run per weekday, so
-that adds at most a late extra reconcile, not a loop.
+These budgets limit only the Worker's own dispatches. Manually dispatched
+Facebook runs and manual-inbox imports still reconcile Pages on their own. There
+are no GitHub scheduled imports or watchdog dispatches after the cutover.
 
 The dispatch contract uses `X-GitHub-Api-Version: 2026-03-10`. A successful
 response is HTTP 200 with `workflow_run_id` and `html_url`. Dispatch is not retried
@@ -242,33 +232,42 @@ optional hardening; restore the defaults if a build then fails to authorize.
 Workers Builds on Free allows 3,000 build minutes a month and one concurrent build.
 A `wrangler rollback` lasts only until the next watched push to `master` redeploys.
 
-### Proof, cutover, and rollback
+### Cutover verification and rollback
 
-The GitHub schedules stay in place, unchanged, until the Worker has proven itself.
-They already fire hours after the Worker's checks, so no offset is needed, and runs
-the Worker dispatches are distinguishable because their actor is
-`troi-0-mandarin-menu-scheduler[bot]`.
+The GitHub watchdog and the importer's native schedule were removed on
+2026-09-27 at the owner's request. Cloudflare is the sole automated scheduler;
+`workflow_dispatch` and manual-inbox imports remain available. The Worker and its
+Cron configuration are unchanged by this repository-only cutover.
 
-Accept the Worker when a real publishing weekday shows all of the following:
+Runs dispatched by Cloudflare are attributed to
+`troi-0-mandarin-menu-scheduler[bot]`. GitHub labels these API-dispatched runs
+as manual even though Cloudflare launched them automatically.
+
+Verify the next two publishing weekdays with all of the following:
 
 1. Past Cron Events and a safe structured log line.
-2. A dispatched run attributed to the App.
-3. An approved import commit.
-4. A successful Pages run for that exact commit.
-5. The correct Sofia-date menu live on the site.
-6. The following Cron reporting `ready` without another dispatch.
+2. A dispatched run attributed to the App when recovery is needed.
+3. An approved import commit, or a documented safe rejection/no-menu result.
+4. A successful Pages run for the exact publication commit after approval.
+5. The correct Sofia-date menu live on the site after approval.
+6. The following Cron reporting `ready` without another dispatch after publication.
+7. No importer runs with `event: schedule` and no GitHub watchdog runs.
 
-Never alter menu data to force a stale state; on a day without a menu post, keep
-monitoring.
+Never alter menu data to force a stale state. A Sunday audit can verify deployed
+configuration and recent weekday evidence, but cannot prove post-cutover weekday
+behavior. See [the dated audit](scheduler-cutover-2026-09-27.md).
 
-Then remove only the importer's `schedule` block, keeping `workflow_dispatch`, and
-monitor the next two weekdays. Keep the watchdog's schedule. It needs no Gemini key
-or Playwright, and even arriving hours late it can still rescue a day on which
-Cloudflare, the App, or a deploy failed. GitHub also emails workflow failures, which
-makes it the only free alert in this design.
+There is no independent scheduled GitHub freshness check or alert after this
+cutover. Check Cloudflare logs and importer failures when a menu is overdue.
+Cloudflare outages, App authorization problems, and exhausted import budgets now
+require manual recovery; manually dispatch the Facebook importer with
+`dry_run=false` after resolving the cause.
 
-To roll back, revert the schedule-removal commit and dispatch the importer manually
-if today's menu is still missing.
+To roll back, revert the schedule-removal commit. This restores both GitHub
+schedules and the watchdog code. Re-enable the restored watchdog with
+`gh workflow enable recover-missed-import.yml --repo Troi-0/mandarin-ordering`
+because its hosted workflow is disabled separately. Dispatch the importer
+manually if today's menu is still missing.
 
 ### Key rotation and retirement
 
@@ -301,7 +300,7 @@ bindings that require a payment method) to this Worker. The API reports
 | --- | --- |
 | 100,000 requests per day | 28 Cron invocations per weekday |
 | 50 subrequests per invocation | at most 17 (token, SHA, menu, ten active-run queries, exact Pages, today's importer runs, today's Pages runs, dispatch), asserted by tests |
-| 10 ms CPU per Cron invocation | about 1.2 ms of signing and JSON parsing measured locally for a heavy day (30 importer and 30 Pages runs listed); network waiting is not CPU |
+| 10 ms CPU per Cron invocation | live September 24–25 invocations reached 20 ms; 39 of 56 exceeded 10 ms despite successful outcomes. CPU margin remains unresolved; local timings do not prove live compliance |
 | 5 Cron Triggers per account | 1, shared with any other Worker on the account |
 | 200,000 log and trace events per day, 3-day retention | about 450 events per weekday; traces are free in beta and count toward this same allowance from 1 October 2026 |
 | Workers Builds: 3,000 build minutes a month, 1 concurrent build | builds only when `workers/menu-scheduler/` changes |
@@ -323,7 +322,8 @@ on Workers Free and the Gemini project without a billing account.
 
 Cloudflare outages or free limits, App key revocation, GitHub API or runner outages,
 and Facebook or Gemini failures can still prevent a publication. Logs make failures
-inspectable; the watchdog schedule is what raises an alert.
+inspectable. There is no independent GitHub scheduled watchdog or freshness
+alert; failure notifications depend on a workflow actually starting.
 
 ## Safe live test
 
@@ -471,13 +471,8 @@ before assuming the importer is at fault.
   permanent errors and exhausted retries still fail closed.
 - The browser checks the Sofia date independently. A stale embedded menu renders
   an unavailable screen and cannot be selected or shared.
-- GitHub may disable scheduled workflows in a public repository after 60 days
-  without repository activity. Re-enable the workflow from the Actions tab if
-  needed.
-- GitHub documents scheduled Actions as best-effort, and its runs have arrived
-  hours late, so the Cloudflare scheduler is authoritative. The UTC watchdog
-  schedule stays as a late, independent backstop and alert;
-  **workflow_dispatch** remains the free manual fallback if both providers are
-  unavailable.
+- Cloudflare is the sole automated scheduler. **workflow_dispatch** remains the
+  free manual fallback when Cloudflare cannot dispatch or its retry budget is
+  exhausted. It still requires GitHub, Facebook, and Gemini to be available.
 - If GitHub Pages, standard public-repository runners, or the Gemini free tier
   stops being free, disable the affected workflow. Do not add a metered fallback.

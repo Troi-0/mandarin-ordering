@@ -1,4 +1,4 @@
-import { readFile } from 'node:fs/promises'
+import { readFile, readdir } from 'node:fs/promises'
 import { describe, expect, it } from 'vitest'
 
 async function workflow(name: string): Promise<string> {
@@ -21,9 +21,8 @@ describe('GitHub workflow contracts', () => {
   it('keeps Facebook dry runs unpublished and reconciles every successful live import', async () => {
     const importer = await workflow('import-facebook.yml')
 
-    expect(importer).toContain('timezone: Europe/Sofia')
-    expect(importer).toContain("cron: '7,22,37,52 8-11 * * 1-5'")
-    expect(importer).not.toContain("cron: '0,30 8-11 * * *'")
+    expect(importer).toContain('workflow_dispatch:')
+    expect(importer).not.toContain('schedule:')
     expect(importer).toContain('contents: write\n  actions: read')
     expect(importer).toContain('IMPORT_DRY_RUN: ${{ inputs.dry_run }}')
     expect(importer).toContain('IMPORT_BENCHMARK_IMAGE: ${{ inputs.benchmark_image_path }}')
@@ -71,19 +70,13 @@ describe('GitHub workflow contracts', () => {
     expect(benchmark).not.toContain('git push')
   })
 
-  it('independently recovers a missed primary schedule without running Gemini when fresh', async () => {
-    const watchdog = await workflow('recover-missed-import.yml')
+  it('leaves daily scheduling exclusively to Cloudflare', async () => {
+    const names = await readdir('.github/workflows')
 
-    expect(watchdog).toContain("cron: '13,33,53 6-9 * * 1-5'")
-    expect(watchdog).not.toContain('timezone: Europe/Sofia')
-    expect(watchdog).toContain('contents: read\n  actions: write')
-    expect(watchdog).toContain("MENU_WATCHDOG_FORCE: 'true'")
-    expect(watchdog).toContain('run: node scripts/check-menu-freshness.ts')
-    expect(watchdog).toContain("if: steps.freshness.outputs.needs_import == 'true'")
-    expect(watchdog).toContain('gh workflow run import-facebook.yml --ref master -f dry_run=false')
-    expect(watchdog).toContain('for attempt in 1 2 3')
-    expect(watchdog).not.toContain('GEMINI_API_KEY')
-    expect(watchdog).not.toContain('playwright')
+    expect(names).not.toContain('recover-missed-import.yml')
+    for (const name of names.filter((name) => /\.ya?ml$/.test(name))) {
+      expect(await workflow(name), name).not.toMatch(/^\s+schedule:/m)
+    }
   })
 
   it('builds Pages from menu changes and from the bot repository dispatch', async () => {

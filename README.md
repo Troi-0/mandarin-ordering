@@ -30,13 +30,9 @@ that package once with `npm ci --prefix workers/menu-scheduler`.
   retry budget. It authenticates as a private GitHub App whose one-hour
   installation tokens are scoped to this repository; the App key is an encrypted
   Worker secret. See [docs/operations.md](docs/operations.md).
-- GitHub's own schedules, four importer attempts per hour from 08:07 through
-  11:52 Sofia time, remain during the Worker's proof period. They are
-  best-effort and have been arriving hours late.
-- A separate UTC-scheduled watchdog checks the committed menu without Facebook,
-  Playwright, Gemini, or its API key. If today's plausible menu is missing during
-  its cron-defined Sofia ordering window, it retries dispatching the production
-  importer even when GitHub starts the watchdog late.
+- Cloudflare is the sole daily scheduler. The importer has no GitHub schedule,
+  and the separate GitHub watchdog has been removed. GitHub Actions still runs
+  extraction and publication; `workflow_dispatch` remains the manual fallback.
 - `npm run import:manual -- manual-inbox/YYYY-MM-DD.png` processes a manually
   uploaded image.
 - Both commands require `GEMINI_API_KEY`. The Google AI project must remain on
