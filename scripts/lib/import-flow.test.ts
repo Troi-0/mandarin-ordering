@@ -349,8 +349,8 @@ describe('menu import orchestration', () => {
     if (publication.status !== 'ready') throw new Error('Expected a ready publication')
     expect(publication.menu.categories[4].items[1].priceCents).toBe(179)
     expect(publication.menu.validation).toEqual({
-      extractedBy: 'gemini-3.6-flash',
-      verifiedBy: 'gemini-3.6-flash:focused-consensus',
+      extractedBy: 'gemini-3.8-flash',
+      verifiedBy: 'gemini-3.8-flash:focused-consensus',
       uncertain: false,
     })
   })

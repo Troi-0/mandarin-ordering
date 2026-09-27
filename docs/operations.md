@@ -14,9 +14,12 @@ database, analytics, payment SDK, hosted font, or order-submission endpoint.
 3. Run **Deploy GitHub Pages** once from the Actions tab. After that, successful
    menu commits deploy automatically.
 
-The only allowed model is `gemini-3.6-flash`. The importer sends only the
-already-public restaurant menu image to Gemini. It never receives visitor names,
-selections, or browser data.
+Production is pinned to `gemini-3.8-flash` with low thinking and high per-image
+resolution. The same configuration is used for extraction, blind verification,
+and focused re-inspection, without deprecated sampling parameters. Manual
+benchmarks retain the former 3.6 control and the other exact free-allowlisted
+configurations. The importer sends only the already-public restaurant menu image
+to Gemini. It never receives visitor names, selections, or browser data.
 
 ## Daily behavior
 
@@ -367,9 +370,10 @@ for the untargeted daily import.
 
 The manually dispatched **Benchmark free Gemini menu OCR** workflow runs one
 selected configuration on both archived human-verified menu images. Its choices
-cover the production Gemini 3.6 control, Gemini 3.7 with low thinking and high
-image resolution, plus Gemini 3.8 with low and medium thinking at both high and
-per-image ultra-high resolution. Separate, short runs keep free-tier demand
+cover the former Gemini 3.6 production control, Gemini 3.7 with low thinking and
+high image resolution, plus Gemini 3.8 with low and medium thinking at both high
+and per-image ultra-high resolution. The 3.8 low/high choice is also the current
+production configuration. Separate, short runs keep free-tier demand
 failures attributable to the exact candidate. Benchmark calls do not retry so
 availability problems are measured without blocking the full matrix; production
 calls retain five bounded retries. Candidate model IDs are exact and allowlisted;

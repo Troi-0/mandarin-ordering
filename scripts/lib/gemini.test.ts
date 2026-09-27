@@ -41,7 +41,7 @@ async function humanVerifiedTranscript(): Promise<ExtractedMenu> {
 }
 
 describe('blind Gemini transcription comparison', () => {
-  it('retries a sustained transient Gemini outage with bounded backoff and no model fallback', async () => {
+  it('retries the production 3.8 configuration with bounded backoff and no model fallback', async () => {
     vi.useFakeTimers()
     vi.stubEnv('GEMINI_API_KEY', 'test-key')
     const fetchMock = vi.fn()
@@ -60,8 +60,17 @@ describe('blind Gemini transcription comparison', () => {
 
     await expect(result).resolves.toEqual({ ok: true })
     expect(fetchMock).toHaveBeenCalledTimes(6)
-    expect(fetchMock.mock.calls.every(([url]) => String(url).includes('gemini-3.6-flash')))
-      .toBe(true)
+    for (const [url, init] of fetchMock.mock.calls) {
+      expect(String(url)).toContain('/gemini-3.8-flash:generateContent')
+      const request = JSON.parse(String(init.body))
+      expect(request.generationConfig.thinkingConfig).toEqual({ thinkingLevel: 'low' })
+      expect(request.contents[0].parts[1].mediaResolution).toEqual({
+        level: 'MEDIA_RESOLUTION_HIGH',
+      })
+      expect(request.generationConfig).not.toHaveProperty('temperature')
+      expect(request.generationConfig).not.toHaveProperty('topP')
+      expect(request.generationConfig).not.toHaveProperty('topK')
+    }
   })
 
   it('honors Retry-After when it is longer than the exponential delay', async () => {
@@ -209,6 +218,10 @@ describe('blind Gemini transcription comparison', () => {
   it('keeps every benchmark on an exact free-only model configuration', () => {
     expect(GEMINI_BENCHMARK_CONFIGS.map((config) => config.id)).toHaveLength(6)
     expect(new Set(GEMINI_BENCHMARK_CONFIGS.map((config) => config.id)).size).toBe(6)
+    expect(GEMINI_BENCHMARK_CONFIGS.find((config) => config.id === 'gemini-3.6-control'))
+      .toEqual({ id: 'gemini-3.6-control', model: 'gemini-3.6-flash', temperature: 0 })
+    expect(GEMINI_BENCHMARK_CONFIGS.find((config) => config.id === 'gemini-3.8-low-high'))
+      .toBe(PRODUCTION_GEMINI_CONFIG)
     for (const config of GEMINI_BENCHMARK_CONFIGS) {
       expect(() => assertFreeGeminiConfig(config)).not.toThrow()
       expect(config.model).not.toContain('latest')

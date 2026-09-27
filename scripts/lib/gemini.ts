@@ -24,25 +24,25 @@ export interface GeminiRequestPolicy {
 }
 
 export const PRODUCTION_GEMINI_CONFIG: GeminiConfig = Object.freeze({
-  id: 'gemini-3.6-control',
-  model: 'gemini-3.6-flash',
-  temperature: 0,
+  id: 'gemini-3.8-low-high',
+  model: 'gemini-3.8-flash',
+  thinkingLevel: 'low',
+  mediaResolution: 'high',
 })
 
 export const GEMINI_BENCHMARK_CONFIGS: readonly GeminiConfig[] = Object.freeze([
-  PRODUCTION_GEMINI_CONFIG,
+  Object.freeze({
+    id: 'gemini-3.6-control',
+    model: 'gemini-3.6-flash',
+    temperature: 0,
+  }),
   Object.freeze({
     id: 'gemini-3.7-low-high',
     model: 'gemini-3.7-flash',
     thinkingLevel: 'low',
     mediaResolution: 'high',
   }),
-  Object.freeze({
-    id: 'gemini-3.8-low-high',
-    model: 'gemini-3.8-flash',
-    thinkingLevel: 'low',
-    mediaResolution: 'high',
-  }),
+  PRODUCTION_GEMINI_CONFIG,
   Object.freeze({
     id: 'gemini-3.8-medium-high',
     model: 'gemini-3.8-flash',
