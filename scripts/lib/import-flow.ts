@@ -28,7 +28,7 @@ import {
 
 type FacebookResult = Awaited<ReturnType<typeof fetchFacebookMenu>>
 
-export interface MenuImporterOptions {
+interface MenuImporterOptions {
   root: string
   dryRun: boolean
   reportPath?: string
@@ -39,7 +39,7 @@ export interface MenuImporterOptions {
   resolve?: typeof resolveMenu
 }
 
-export interface ProcessImageOptions {
+interface ProcessImageOptions {
   image: Uint8Array
   mimeType: string
   date: string

@@ -2,7 +2,7 @@ import type { Menu, MenuItem } from './menu-schema.ts'
 
 export type Quantities = Record<string, number>
 
-export interface OrderLine {
+interface OrderLine {
   itemId: string
   name: string
   portion?: string
@@ -11,7 +11,7 @@ export interface OrderLine {
   lineTotalCents: number
 }
 
-export interface OrderSummary {
+interface OrderSummary {
   participantName: string
   note?: string
   menuDate: string
@@ -20,7 +20,7 @@ export interface OrderSummary {
   totalCents: number
 }
 
-export const euroFormatter = new Intl.NumberFormat('bg-BG', {
+const euroFormatter = new Intl.NumberFormat('bg-BG', {
   style: 'currency',
   currency: 'EUR',
   minimumFractionDigits: 2,

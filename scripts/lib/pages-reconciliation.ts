@@ -10,7 +10,7 @@ const REQUEST_TIMEOUT_MS = 15_000
 
 type Fetch = typeof fetch
 
-export interface PagesReconciliationOptions {
+interface PagesReconciliationOptions {
   repository: string
   token: string
   headSha: string
@@ -21,7 +21,7 @@ export interface PagesReconciliationOptions {
   log?: (message: string) => void
 }
 
-export interface PagesReconciliationResult {
+interface PagesReconciliationResult {
   status: 'already-deployed' | 'dispatched'
   menuDate: string
   headSha: string

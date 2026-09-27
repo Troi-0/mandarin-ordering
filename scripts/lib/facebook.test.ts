@@ -2,12 +2,15 @@ import type { Page } from 'playwright'
 import { describe, expect, it, vi } from 'vitest'
 import { PAGE_ID } from '../../src/lib/menu-schema.ts'
 import {
-  extractFacebookCandidatesFromJsonScripts,
   extractTargetedPermalinkImage,
   inspectFacebookFeed,
   selectFacebookCandidate,
   targetedPermalinkCandidate,
 } from './facebook.ts'
+
+function candidatesFromScripts(jsonScripts: readonly string[]) {
+  return inspectFacebookFeed(jsonScripts).candidates
+}
 
 function photo(uri: string, id = 'photo-1') {
   return {
@@ -48,7 +51,7 @@ function feed(...nodes: unknown[]): string {
 
 describe('Facebook embedded post parsing', () => {
   it('sorts same-record candidates by creation timestamp, so an older pinned post cannot win', () => {
-    const result = extractFacebookCandidatesFromJsonScripts([
+    const result = candidatesFromScripts([
       feed(story('111', 100), story('222', 200)),
     ])
 
@@ -58,7 +61,7 @@ describe('Facebook embedded post parsing', () => {
   it('never borrows an older image for a newer image-less post', () => {
     const newerWithoutImage = story('222', 200, { images: [] })
     const olderWithImage = story('111', 100)
-    const result = extractFacebookCandidatesFromJsonScripts([
+    const result = candidatesFromScripts([
       feed(newerWithoutImage, olderWithImage),
     ])
 
@@ -71,7 +74,7 @@ describe('Facebook embedded post parsing', () => {
   })
 
   it('does not accept an author or image found only in a sibling or nested record', () => {
-    const result = extractFacebookCandidatesFromJsonScripts([
+    const result = candidatesFromScripts([
       JSON.stringify({
         post_id: '222',
         creation_time: 200,
@@ -90,7 +93,7 @@ describe('Facebook embedded post parsing', () => {
   })
 
   it('rejects visitor/foreign authors and posts without images', () => {
-    const result = extractFacebookCandidatesFromJsonScripts([
+    const result = candidatesFromScripts([
       feed(
         story('111', 100, { pageId: '999999999999999' }),
         story('222', 200, { images: [] }),
@@ -102,7 +105,7 @@ describe('Facebook embedded post parsing', () => {
 
   it('deduplicates identical embedded records across scripts', () => {
     const duplicate = story('333', 300)
-    expect(extractFacebookCandidatesFromJsonScripts([feed(duplicate), feed(duplicate)])).toHaveLength(1)
+    expect(candidatesFromScripts([feed(duplicate), feed(duplicate)])).toHaveLength(1)
   })
 
   it('rejects conflicting records with the same post ID', () => {
@@ -110,11 +113,11 @@ describe('Facebook embedded post parsing', () => {
     const conflicting = story('333', 300, {
       images: ['https://scontent.example.fbcdn.net/different.jpg'],
     })
-    expect(extractFacebookCandidatesFromJsonScripts([feed(first), feed(conflicting)])).toEqual([])
+    expect(candidatesFromScripts([feed(first), feed(conflicting)])).toEqual([])
   })
 
   it('constructs the canonical Page permalink from the structured record', () => {
-    const [candidate] = extractFacebookCandidatesFromJsonScripts([feed(story('444', 400))])
+    const [candidate] = candidatesFromScripts([feed(story('444', 400))])
     expect(candidate).toEqual({
       postId: '444',
       creationTime: 400,
@@ -124,13 +127,13 @@ describe('Facebook embedded post parsing', () => {
   })
 
   it('supports direct legacy Page author fields', () => {
-    expect(extractFacebookCandidatesFromJsonScripts([
+    expect(candidatesFromScripts([
       feed(story('555', 500, { legacyAuthor: true })),
     ])[0]?.postId).toBe('555')
   })
 
   it('ignores malformed scripts when another script contains a valid record', () => {
-    const result = extractFacebookCandidatesFromJsonScripts([
+    const result = candidatesFromScripts([
       '{malformed',
       feed(story('555', 500)),
     ])
@@ -139,7 +142,7 @@ describe('Facebook embedded post parsing', () => {
 
   it('rejects non-Facebook CDN images, non-HTTPS images, unsafe timestamps, and multiple photos', () => {
     const unsafeTime = story('777', Number.MAX_SAFE_INTEGER + 1)
-    expect(extractFacebookCandidatesFromJsonScripts([
+    expect(candidatesFromScripts([
       feed(
         story('666', 600, { images: ['http://scontent.example.fbcdn.net/menu.jpg'] }),
         story('667', 601, { images: ['https://example.com/menu.jpg'] }),
@@ -217,7 +220,7 @@ describe('Facebook embedded post parsing', () => {
   })
 
   it('selects an explicitly targeted historical post for a safe benchmark', () => {
-    const candidates = extractFacebookCandidatesFromJsonScripts([
+    const candidates = candidatesFromScripts([
       feed(story('111', 100), story('222', 200)),
     ])
 

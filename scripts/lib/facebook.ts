@@ -1,7 +1,7 @@
 import { chromium, type Page } from 'playwright'
 import { FACEBOOK_PAGE_URL, PAGE_ID } from '../../src/lib/menu-schema.ts'
 
-export interface FacebookStoryCandidate {
+interface FacebookStoryCandidate {
   postId: string
   creationTime: number
   imageUrl: string
@@ -203,7 +203,7 @@ function carriesUnusableMedia(record: JsonRecord): boolean {
   )
 }
 
-export interface FacebookFeedInspection {
+interface FacebookFeedInspection {
   candidates: FacebookStoryCandidate[]
   /** Page-authored story records this parser understood, with or without an image. */
   pageStories: number
@@ -258,12 +258,6 @@ export function inspectFacebookFeed(jsonScripts: readonly string[]): FacebookFee
   }
 }
 
-export function extractFacebookCandidatesFromJsonScripts(
-  jsonScripts: readonly string[],
-): FacebookStoryCandidate[] {
-  return inspectFacebookFeed(jsonScripts).candidates
-}
-
 export function selectFacebookCandidate(
   candidates: FacebookStoryCandidate[],
   target?: FacebookPostTarget,
@@ -272,7 +266,7 @@ export function selectFacebookCandidate(
   return candidates.find((candidate) => candidate.postId === target.postId)
 }
 
-export type FacebookMenuResult =
+type FacebookMenuResult =
   | { status: 'ready'; candidate: FacebookStoryCandidate; image: Uint8Array; mimeType: string }
   | { status: 'no-menu-post'; detail: string }
 

@@ -6,9 +6,9 @@ export const FREE_GEMINI_MODELS = [
   'gemini-3.8-flash',
 ] as const
 
-export type FreeGeminiModel = typeof FREE_GEMINI_MODELS[number]
-export type GeminiThinkingLevel = 'low' | 'medium'
-export type GeminiMediaResolution = 'high' | 'ultra-high'
+type FreeGeminiModel = typeof FREE_GEMINI_MODELS[number]
+type GeminiThinkingLevel = 'low' | 'medium'
+type GeminiMediaResolution = 'high' | 'ultra-high'
 
 export interface GeminiConfig {
   id: string
@@ -97,7 +97,7 @@ export const extractedMenuSchema = z.object({
   })).min(2).max(12),
 })
 
-export const verificationSchema = z.object({
+const verificationSchema = z.object({
   approved: z.boolean(),
   uncertain: z.boolean(),
   issues: z.array(z.object({

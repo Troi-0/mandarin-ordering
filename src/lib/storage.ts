@@ -1,6 +1,6 @@
 import type { Quantities } from './order.ts'
 
-export interface BasketDraft {
+interface BasketDraft {
   date: string
   quantities: Quantities
   participantName: string

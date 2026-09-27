@@ -4,14 +4,14 @@ export const PAGE_ID = '100063668642218'
 export const FACEBOOK_PAGE_URL = `https://www.facebook.com/profile.php?id=${PAGE_ID}`
 export const SOFIA_TIME_ZONE = 'Europe/Sofia'
 
-export const menuItemSchema = z.object({
+const menuItemSchema = z.object({
   id: z.string().min(3).max(80),
   name: z.string().trim().min(2).max(220),
   portion: z.string().trim().min(1).max(80).optional(),
   priceCents: z.number().int().min(1).max(10_000),
 })
 
-export const menuCategorySchema = z.object({
+const menuCategorySchema = z.object({
   id: z.string().min(2).max(50),
   name: z.string().trim().min(2).max(80),
   items: z.array(menuItemSchema).min(1).max(40),
@@ -38,13 +38,13 @@ export const menuSchema = z.object({
   categories: z.array(menuCategorySchema).min(2).max(12),
 })
 
-export const unavailablePublicationSchema = z.object({
+const unavailablePublicationSchema = z.object({
   status: z.literal('unavailable'),
   reason: z.enum(['not-imported', 'not-posted', 'import-failed']),
   lastCheckedAt: z.iso.datetime({ offset: true }).optional(),
 })
 
-export const readyPublicationSchema = z.object({
+const readyPublicationSchema = z.object({
   status: z.literal('ready'),
   menu: menuSchema,
 })
@@ -55,9 +55,7 @@ export const menuPublicationSchema = z.discriminatedUnion('status', [
 ])
 
 export type MenuItem = z.infer<typeof menuItemSchema>
-export type MenuCategory = z.infer<typeof menuCategorySchema>
 export type Menu = z.infer<typeof menuSchema>
-export type MenuPublication = z.infer<typeof menuPublicationSchema>
 
 export function assertMenuInvariants(menu: Menu): void {
   const items = menu.categories.flatMap((category) => category.items)

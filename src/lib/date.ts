@@ -39,7 +39,7 @@ export function isTodayInSofia(date: string, now: Date = new Date()): boolean {
  */
 export const MENU_OVERDUE_SOFIA_HOUR = 11
 
-export function sofiaHour(input: Date = new Date()): number {
+function sofiaHour(input: Date = new Date()): number {
   const [part] = new Intl.DateTimeFormat('en-CA', {
     timeZone: SOFIA_TIME_ZONE,
     hour: '2-digit',

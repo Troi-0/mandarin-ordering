@@ -7,7 +7,7 @@ import {
 } from '../../src/lib/menu-schema.ts'
 import { FREE_GEMINI_MODEL, type ExtractedMenu } from './gemini.ts'
 
-export interface MenuBuildOptions {
+interface MenuBuildOptions {
   date: string
   sourcePostId: string
   sourcePostUrl: string
@@ -18,7 +18,7 @@ export interface MenuBuildOptions {
   verificationMethod?: 'blind-transcription' | 'focused-consensus'
 }
 
-export interface ReviewMenu extends Omit<Menu, 'validation'> {
+interface ReviewMenu extends Omit<Menu, 'validation'> {
   validation: {
     extractedBy: string
     verifiedBy: 'human-review-required'
