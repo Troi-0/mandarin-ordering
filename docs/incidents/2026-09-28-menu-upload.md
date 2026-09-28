@@ -24,8 +24,15 @@
   at 15:29 Sofia exhausted Gemini 3.8 retries with HTTP 429, then tried 3.7
   and 3.6 in order. Both fallback models exhausted HTTP 503 retries during the
   first transcription. The run made no menu or review commit.
-- The hosted `current-menu.json` remained dated 2026-09-24. No 2026-09-28 menu
-  was published. The browser's Sofia-date gate keeps stale menu data unavailable.
+- Until recovery, the hosted `current-menu.json` remained dated 2026-09-24.
+  The browser's Sofia-date gate kept the stale menu unavailable.
+- With the 20-retry policy, [run 36424935494](https://github.com/Troi-0/mandarin-ordering/actions/runs/36424935494)
+  encountered Gemini 3.8 HTTP 503 and then a per-day quota 429. It moved
+  immediately to 3.7, where two transient 503 responses preceded successful
+  extraction and blind verification. The importer published 43 items in six
+  categories in [commit 30ad36a](https://github.com/Troi-0/mandarin-ordering/commit/30ad36acc158c10f3e87c7e690475ac31b993147).
+  [Pages run 36425102959](https://github.com/Troi-0/mandarin-ordering/actions/runs/36425102959)
+  deployed that exact commit, and the live browser displayed today's menu.
 - On September 27, seven manually dispatched model benchmarks shared the
   production `GEMINI_API_KEY`. Their reports show widespread 503 responses;
   the three Gemini 3.8 low/high runs completed one of six fixture cases safely.
@@ -47,7 +54,8 @@
   passes and fail-closed agreement gate still control publication.
 - Allow up to 20 retries per model for transient failures, while moving on
   immediately when a structured 429 response identifies a per-day quota.
-  Extend the GitHub import job timeout so all configured retries can finish.
+  Extend the GitHub import job timeout so a long first-pass fallback sequence
+  has room to finish.
 
 Google documents that requests-per-day quotas reset at midnight Pacific and
 that model capacity and active limits can vary. The scheduler retry and model
