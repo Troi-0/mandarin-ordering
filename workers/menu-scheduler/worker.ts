@@ -6,6 +6,10 @@ const MENU_PATH = 'data/current-menu.json'
 const GITHUB_API = 'https://api.github.com'
 const API_VERSION = '2026-03-10'
 const SOFIA_TIME_ZONE = 'Europe/Sofia'
+const PACIFIC_DATE_FORMATTER = new Intl.DateTimeFormat('en-CA', {
+  timeZone: 'America/Los_Angeles',
+  year: 'numeric', month: '2-digit', day: '2-digit',
+})
 const ACTIVE_RUN_STATUSES = new Set(['queued', 'in_progress', 'waiting', 'pending', 'requested'])
 // Only genuine importer failures count. The menu-import concurrency group
 // cancels superseded pending runs as a matter of course, so a cancellation there
@@ -19,6 +23,9 @@ const WINDOW_CLOSES_AT_MINUTE = 14 * 60
 // A persistent Facebook or OCR failure must not become an all-day retry storm
 // of Playwright scrapes, free Gemini calls, and review-draft commits.
 export const MAX_FAILED_IMPORTS_PER_DAY = 3
+// One extra attempt after Google's free daily quota resets can recover a menu
+// when all three morning failures occurred on the previous Pacific date.
+const MAX_POST_RESET_IMPORTS = 1
 // Recovering a missing Pages deployment never scrapes or transcribes: the
 // importer sees today's ready menu and only reconciles. It therefore keeps its
 // own budget after imports are exhausted, bounded by unsuccessful Pages runs and
@@ -60,6 +67,7 @@ interface WorkflowRun {
   status?: unknown
   conclusion?: unknown
   head_sha?: unknown
+  created_at?: unknown
 }
 
 interface WorkflowRunsResponse {
@@ -72,6 +80,7 @@ interface RecoveryInputs {
   importerRuns: WorkflowRun[]
   pagesRuns: WorkflowRun[]
   failedImportsToday: number
+  postResetRetryAvailable: boolean
   failedPagesToday: number
   now: Date
 }
@@ -112,6 +121,12 @@ function isRecoveryWindow(clock: ReturnType<typeof sofiaClock>): boolean {
   return ['Mon', 'Tue', 'Wed', 'Thu', 'Fri'].includes(clock.weekday)
     && clock.minuteOfDay >= WINDOW_OPENS_AT_MINUTE
     && clock.minuteOfDay < WINDOW_CLOSES_AT_MINUTE
+}
+
+function pacificDate(date: Date): string {
+  const parts = PACIFIC_DATE_FORMATTER.formatToParts(date)
+  const values = Object.fromEntries(parts.map((part) => [part.type, part.value]))
+  return `${values.year}-${values.month}-${values.day}`
 }
 
 function hasPlausibleReadyMenu(value: unknown, expectedDate: string): boolean {
@@ -159,7 +174,9 @@ export function evaluateRecovery(inputs: RecoveryInputs): RecoveryDecision {
     run.head_sha === inputs.headSha && run.status === 'completed' && run.conclusion === 'success'
   ))) return decide(false, 'ready')
   if (!menuReady) {
-    return inputs.failedImportsToday >= MAX_FAILED_IMPORTS_PER_DAY
+    const importLimit = MAX_FAILED_IMPORTS_PER_DAY
+      + (inputs.postResetRetryAvailable ? MAX_POST_RESET_IMPORTS : 0)
+    return inputs.failedImportsToday >= importLimit
       ? decide(false, 'attempts-exhausted')
       : decide(true, 'stale')
   }
@@ -355,8 +372,20 @@ async function completedRunsToday(
   }), token, fetchImpl)
 }
 
-function countFailedImports(runs: WorkflowRun[]): number {
-  return runs.filter((run) => typeof run.conclusion === 'string' && FAILED_IMPORT_CONCLUSIONS.has(run.conclusion)).length
+function failedImportRuns(runs: WorkflowRun[]): WorkflowRun[] {
+  return runs.filter((run) => typeof run.conclusion === 'string' && FAILED_IMPORT_CONCLUSIONS.has(run.conclusion))
+}
+
+function postResetRetryAvailable(failures: WorkflowRun[], now: Date): boolean {
+  if (failures.length !== MAX_FAILED_IMPORTS_PER_DAY) return false
+  const todayInPacific = pacificDate(now)
+  return failures.every((run) => {
+    if (typeof run.created_at !== 'string') return false
+    const createdAt = new Date(run.created_at)
+    return Number.isFinite(createdAt.getTime())
+      && createdAt.getTime() <= now.getTime()
+      && pacificDate(createdAt) < todayInPacific
+  })
 }
 
 function countUnsuccessfulPagesRuns(runs: WorkflowRun[]): number {
@@ -377,6 +406,7 @@ export async function checkAndRecover(
     importerRuns: [],
     pagesRuns: [],
     failedImportsToday: 0,
+    postResetRetryAvailable: false,
     failedPagesToday: 0,
     now,
   })
@@ -393,16 +423,18 @@ export async function checkAndRecover(
   }
 
   // Every remaining read is pinned to that immutable SHA or filtered by it.
-  const [publication, importerRuns, pagesRuns, exactPagesRuns, failedImports, failedPages] = await Promise.all([
+  const [publication, importerRuns, pagesRuns, exactPagesRuns, completedImports, failedPages] = await Promise.all([
     githubGet(
       `/repos/${REPOSITORY}/contents/${MENU_PATH}?ref=${headSha}`, token, fetchImpl, 'application/vnd.github.raw+json',
     ).then((response) => readJson<unknown>(response)),
     activeWorkflowRuns(IMPORT_WORKFLOW, token, fetchImpl),
     activeWorkflowRuns(PAGES_WORKFLOW, token, fetchImpl),
     listRuns(runsPath(PAGES_WORKFLOW, { status: 'success', head_sha: headSha, per_page: '1' }), token, fetchImpl),
-    completedRunsToday(IMPORT_WORKFLOW, now, token, fetchImpl).then(countFailedImports),
+    completedRunsToday(IMPORT_WORKFLOW, now, token, fetchImpl),
     completedRunsToday(PAGES_WORKFLOW, now, token, fetchImpl).then(countUnsuccessfulPagesRuns),
   ])
+  const failures = failedImportRuns(completedImports)
+  const failedImports = failures.length
 
   const decision = evaluateRecovery({
     publication,
@@ -410,6 +442,7 @@ export async function checkAndRecover(
     importerRuns,
     pagesRuns: [...pagesRuns, ...exactPagesRuns],
     failedImportsToday: failedImports,
+    postResetRetryAvailable: postResetRetryAvailable(failures, now),
     failedPagesToday: failedPages,
     now,
   })

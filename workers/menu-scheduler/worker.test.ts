@@ -19,7 +19,7 @@ const RUN_URL = 'https://github.com/Troi-0/mandarin-ordering/actions/runs/123'
 const TOKEN_URL = 'https://api.github.com/app/installations/4242/access_tokens'
 const DISPATCH_URL = 'https://api.github.com/repos/Troi-0/mandarin-ordering/actions/workflows/import-facebook.yml/dispatches'
 
-interface Run { status: string; conclusion?: string | null; head_sha?: string }
+interface Run { status: string; conclusion?: string | null; head_sha?: string; created_at?: string }
 
 let privateKeyPem = ''
 let publicKey: CryptoKey
@@ -151,7 +151,8 @@ const sofiaTime = new Intl.DateTimeFormat('en-GB', {
 
 function decisionAt(now: Date, overrides: Partial<Parameters<typeof evaluateRecovery>[0]> = {}) {
   return evaluateRecovery({
-    publication: null, headSha: HEAD_SHA, importerRuns: [], pagesRuns: [], failedImportsToday: 0, failedPagesToday: 0, now, ...overrides,
+    publication: null, headSha: HEAD_SHA, importerRuns: [], pagesRuns: [],
+    failedImportsToday: 0, postResetRetryAvailable: false, failedPagesToday: 0, now, ...overrides,
   })
 }
 
@@ -434,6 +435,54 @@ describe('menu recovery against GitHub', () => {
       completedImports: ['failure', 'timed_out', 'startup_failure'].map((conclusion) => ({ status: 'completed', conclusion })),
     })
     await expect(checkAndRecover(FRIDAY_MORNING, env(), fetchMock))
+      .resolves.toMatchObject({ dispatch: false, reason: 'attempts-exhausted' })
+    expect(calls(fetchMock).some(({ url }) => url.href === DISPATCH_URL)).toBe(false)
+  })
+
+  it.each([
+    ['summer', '2026-09-28T07:07:00Z', '2026-09-28T05:38:02Z', '2026-09-28'],
+    ['winter', '2026-12-04T08:07:00Z', '2026-12-04T06:38:02Z', '2026-12-04'],
+  ])('allows one bounded import after the Pacific quota reset in %s', async (_, now, createdAt, sofiaDate) => {
+    const failedRuns = Array.from({ length: MAX_FAILED_IMPORTS_PER_DAY }, () => ({
+      status: 'completed', conclusion: 'failure', created_at: createdAt,
+    }))
+    const fetchMock = github({
+      menu: publication('2026-09-24'),
+      completedImports: failedRuns,
+      dispatch: response({ workflow_run_id: 123, html_url: RUN_URL }),
+    })
+    await expect(checkAndRecover(new Date(now), env(), fetchMock)).resolves.toMatchObject({
+      dispatch: true, reason: 'stale', sofiaDate, runUrl: RUN_URL,
+    })
+    expect(calls(fetchMock).filter(({ url }) => url.href === DISPATCH_URL)).toHaveLength(1)
+  })
+
+  it('stops after the post-reset attempt or when failed-run timestamps are missing', async () => {
+    const now = new Date('2026-09-28T07:22:00Z')
+    const beforeReset = Array.from({ length: MAX_FAILED_IMPORTS_PER_DAY }, () => ({
+      status: 'completed', conclusion: 'failure', created_at: '2026-09-28T05:38:02Z',
+    }))
+    for (const completedImports of [
+      [...beforeReset, { status: 'completed', conclusion: 'failure', created_at: '2026-09-28T07:10:00Z' }],
+      Array.from({ length: MAX_FAILED_IMPORTS_PER_DAY }, () => ({
+        status: 'completed', conclusion: 'failure',
+      })),
+      beforeReset.map((run, index) => index === 0 ? { ...run, created_at: 'invalid' } : run),
+      [...beforeReset.slice(0, 2), { status: 'completed', conclusion: 'failure', created_at: '2026-09-28T07:10:00Z' }],
+    ]) {
+      const fetchMock = github({ menu: publication('2026-09-24'), completedImports })
+      await expect(checkAndRecover(now, env(), fetchMock))
+        .resolves.toMatchObject({ dispatch: false, reason: 'attempts-exhausted' })
+      expect(calls(fetchMock).some(({ url }) => url.href === DISPATCH_URL)).toBe(false)
+    }
+  })
+
+  it('does not spend the extra attempt before the Pacific reset', async () => {
+    const failedRuns = Array.from({ length: MAX_FAILED_IMPORTS_PER_DAY }, () => ({
+      status: 'completed', conclusion: 'failure', created_at: '2026-09-28T05:38:02Z',
+    }))
+    const fetchMock = github({ menu: publication('2026-09-24'), completedImports: failedRuns })
+    await expect(checkAndRecover(new Date('2026-09-28T06:52:00Z'), env(), fetchMock))
       .resolves.toMatchObject({ dispatch: false, reason: 'attempts-exhausted' })
     expect(calls(fetchMock).some(({ url }) => url.href === DISPATCH_URL)).toBe(false)
   })

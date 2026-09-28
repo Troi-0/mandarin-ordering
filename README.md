@@ -26,7 +26,8 @@ that package once with `npm ci --prefix workers/menu-scheduler`.
   through Friday it checks the committed menu, active runs, and the exact Pages
   deployment every 15 minutes from 08:37 through 13:52 Sofia time, dispatching
   the importer only when recovery is needed. It stops importing after three
-  failed imports in a day, while a missing site deployment keeps its own small
+  failed imports in a day, with one extra attempt after the Pacific quota reset
+  if all three failed before it. A missing site deployment keeps its own small
   retry budget. It authenticates as a private GitHub App whose one-hour
   installation tokens are scoped to this repository; the App key is an encrypted
   Worker secret. See [docs/operations.md](docs/operations.md).
@@ -35,8 +36,10 @@ that package once with `npm ci --prefix workers/menu-scheduler`.
   extraction and publication; `workflow_dispatch` remains the manual fallback.
 - `npm run import:manual -- manual-inbox/YYYY-MM-DD.png` processes a manually
   uploaded image.
-- Both commands require `GEMINI_API_KEY`. The Google AI project must remain on
-  the free tier with billing disabled; there is no paid fallback.
+- Live imports require `GEMINI_API_KEY`. Benchmarks and dry runs require
+  `GEMINI_BENCHMARK_API_KEY` from a different Google project so they cannot use
+  the live project's quota. Both projects must remain on the free tier with
+  billing disabled; there is no paid fallback.
 - Transient Gemini and network failures use bounded exponential backoff with
   jitter and `Retry-After` support before failing closed.
 - If the two full-image passes disagree or flag uncertainty, one focused close

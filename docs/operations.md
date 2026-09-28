@@ -11,7 +11,12 @@ database, analytics, payment SDK, hosted font, or order-submission endpoint.
 2. In Google AI Studio, create a Gemini Developer API key in a project with no
    billing account attached. Add it as the repository Actions secret
    `GEMINI_API_KEY`. Never add a paid fallback or attach billing to that project.
-3. Run **Deploy GitHub Pages** once from the Actions tab. After that, successful
+3. For benchmarks and dry runs, create a second key in a **different**
+   billing-disabled Google project and save it as `GEMINI_BENCHMARK_API_KEY`.
+   Google applies Gemini limits per project, so another key in the production
+   project would still share its quota. If this secret is absent, benchmarks and
+   dry runs fail before calling Gemini; live imports still use `GEMINI_API_KEY`.
+4. Run **Deploy GitHub Pages** once from the Actions tab. After that, successful
    menu commits deploy automatically.
 
 Production is pinned to `gemini-3.8-flash` with low thinking and high per-image
@@ -29,7 +34,9 @@ importer when today's menu or its Pages deployment is missing. Cloudflare is the
 sole daily scheduler: the importer has no GitHub `schedule`, and the separate
 GitHub watchdog has been removed. The Facebook importer remains callable through
 `workflow_dispatch`, including manual dry runs and live recovery. The
-importer parses Facebook's embedded JSON and accepts an image
+production key is used only for live imports; benchmarks and dry runs use the
+separate benchmark project. The importer parses Facebook's embedded JSON and
+accepts an image
 only when the same structured post record directly owns the post ID, creation
 time, Mandarin House Page author, and one unambiguous Facebook CDN attachment.
 It sorts those records by embedded creation time, rejects anything not dated
@@ -378,7 +385,10 @@ failures attributable to the exact candidate. Benchmark calls do not retry so
 availability problems are measured without blocking the full matrix; production
 calls retain five bounded retries. Candidate model IDs are exact and allowlisted;
 the workflow has read-only repository permission, cannot publish menu data, and
-never changes the scheduled production configuration.
+never changes the scheduled production configuration. It requires
+`GEMINI_BENCHMARK_API_KEY` from a separate free project; running a benchmark with
+the production project can exhaust the next Sofia morning's quota because
+Gemini's requests-per-day limit resets at midnight Pacific time.
 
 The uploaded `gemini-benchmark-<run id>` report retains both raw transcripts,
 elapsed time, human-reference comparisons for both passes, the existing blind
@@ -473,6 +483,10 @@ before assuming the importer is at fault.
   responses at most five times with bounded exponential backoff, jitter, and
   `Retry-After` support. They never switch models or paid service tiers;
   permanent errors and exhausted retries still fail closed.
+- The scheduler stops after three failed live imports on a Sofia day. When all
+  three were dispatched before Google's midnight Pacific daily quota reset, it
+  allows exactly one additional attempt after the reset within its normal Sofia
+  window. A missing or malformed run timestamp cannot unlock that attempt.
 - The browser checks the Sofia date independently. A stale embedded menu renders
   an unavailable screen and cannot be selected or shared.
 - Cloudflare is the sole automated scheduler. **workflow_dispatch** remains the
