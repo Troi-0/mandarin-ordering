@@ -484,9 +484,9 @@ before assuming the importer is at fault.
   `Retry-After` support. They never switch models or paid service tiers;
   permanent errors and exhausted retries still fail closed.
 - The scheduler stops after three failed live imports on a Sofia day. When all
-  three were dispatched before Google's midnight Pacific daily quota reset, it
+  three completed before Google's midnight Pacific daily quota reset, it
   allows exactly one additional attempt after the reset within its normal Sofia
-  window. A missing or malformed run timestamp cannot unlock that attempt.
+  window. A missing or malformed completion timestamp cannot unlock that attempt.
 - The browser checks the Sofia date independently. A stale embedded menu renders
   an unavailable screen and cannot be selected or shared.
 - Cloudflare is the sole automated scheduler. **workflow_dispatch** remains the

@@ -24,7 +24,7 @@ const WINDOW_CLOSES_AT_MINUTE = 14 * 60
 // of Playwright scrapes, free Gemini calls, and review-draft commits.
 export const MAX_FAILED_IMPORTS_PER_DAY = 3
 // One extra attempt after Google's free daily quota resets can recover a menu
-// when all three morning failures occurred on the previous Pacific date.
+// when all three morning failures completed on the previous Pacific date.
 const MAX_POST_RESET_IMPORTS = 1
 // Recovering a missing Pages deployment never scrapes or transcribes: the
 // importer sees today's ready menu and only reconciles. It therefore keeps its
@@ -67,7 +67,7 @@ interface WorkflowRun {
   status?: unknown
   conclusion?: unknown
   head_sha?: unknown
-  created_at?: unknown
+  updated_at?: unknown
 }
 
 interface WorkflowRunsResponse {
@@ -380,11 +380,11 @@ function postResetRetryAvailable(failures: WorkflowRun[], now: Date): boolean {
   if (failures.length !== MAX_FAILED_IMPORTS_PER_DAY) return false
   const todayInPacific = pacificDate(now)
   return failures.every((run) => {
-    if (typeof run.created_at !== 'string') return false
-    const createdAt = new Date(run.created_at)
-    return Number.isFinite(createdAt.getTime())
-      && createdAt.getTime() <= now.getTime()
-      && pacificDate(createdAt) < todayInPacific
+    if (typeof run.updated_at !== 'string') return false
+    const completedAt = new Date(run.updated_at)
+    return Number.isFinite(completedAt.getTime())
+      && completedAt.getTime() <= now.getTime()
+      && pacificDate(completedAt) < todayInPacific
   })
 }
 

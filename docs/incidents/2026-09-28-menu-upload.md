@@ -31,7 +31,7 @@
   If that secret is absent, those diagnostic runs fail before a Gemini call;
   live imports retain the production key.
 - Allow one extra scheduler dispatch after the Pacific daily quota reset only
-  when all three failed runs on that Sofia day were created before the reset.
+  when all three failed runs on that Sofia day completed before the reset.
   The additional attempt stays within the existing Sofia publishing window.
   A fourth failure closes the import budget for that day.
 

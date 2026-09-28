@@ -19,7 +19,7 @@ const RUN_URL = 'https://github.com/Troi-0/mandarin-ordering/actions/runs/123'
 const TOKEN_URL = 'https://api.github.com/app/installations/4242/access_tokens'
 const DISPATCH_URL = 'https://api.github.com/repos/Troi-0/mandarin-ordering/actions/workflows/import-facebook.yml/dispatches'
 
-interface Run { status: string; conclusion?: string | null; head_sha?: string; created_at?: string }
+interface Run { status: string; conclusion?: string | null; head_sha?: string; updated_at?: string }
 
 let privateKeyPem = ''
 let publicKey: CryptoKey
@@ -442,9 +442,9 @@ describe('menu recovery against GitHub', () => {
   it.each([
     ['summer', '2026-09-28T07:07:00Z', '2026-09-28T05:38:02Z', '2026-09-28'],
     ['winter', '2026-12-04T08:07:00Z', '2026-12-04T06:38:02Z', '2026-12-04'],
-  ])('allows one bounded import after the Pacific quota reset in %s', async (_, now, createdAt, sofiaDate) => {
+  ])('allows one bounded import after the Pacific quota reset in %s', async (_, now, updatedAt, sofiaDate) => {
     const failedRuns = Array.from({ length: MAX_FAILED_IMPORTS_PER_DAY }, () => ({
-      status: 'completed', conclusion: 'failure', created_at: createdAt,
+      status: 'completed', conclusion: 'failure', updated_at: updatedAt,
     }))
     const fetchMock = github({
       menu: publication('2026-09-24'),
@@ -457,18 +457,18 @@ describe('menu recovery against GitHub', () => {
     expect(calls(fetchMock).filter(({ url }) => url.href === DISPATCH_URL)).toHaveLength(1)
   })
 
-  it('stops after the post-reset attempt or when failed-run timestamps are missing', async () => {
+  it('stops after the post-reset attempt or when completion timestamps are missing', async () => {
     const now = new Date('2026-09-28T07:22:00Z')
     const beforeReset = Array.from({ length: MAX_FAILED_IMPORTS_PER_DAY }, () => ({
-      status: 'completed', conclusion: 'failure', created_at: '2026-09-28T05:38:02Z',
+      status: 'completed', conclusion: 'failure', updated_at: '2026-09-28T05:41:29Z',
     }))
     for (const completedImports of [
-      [...beforeReset, { status: 'completed', conclusion: 'failure', created_at: '2026-09-28T07:10:00Z' }],
+      [...beforeReset, { status: 'completed', conclusion: 'failure', updated_at: '2026-09-28T07:10:00Z' }],
       Array.from({ length: MAX_FAILED_IMPORTS_PER_DAY }, () => ({
         status: 'completed', conclusion: 'failure',
       })),
-      beforeReset.map((run, index) => index === 0 ? { ...run, created_at: 'invalid' } : run),
-      [...beforeReset.slice(0, 2), { status: 'completed', conclusion: 'failure', created_at: '2026-09-28T07:10:00Z' }],
+      beforeReset.map((run, index) => index === 0 ? { ...run, updated_at: 'invalid' } : run),
+      [...beforeReset.slice(0, 2), { status: 'completed', conclusion: 'failure', updated_at: '2026-09-28T07:10:00Z' }],
     ]) {
       const fetchMock = github({ menu: publication('2026-09-24'), completedImports })
       await expect(checkAndRecover(now, env(), fetchMock))
@@ -479,7 +479,7 @@ describe('menu recovery against GitHub', () => {
 
   it('does not spend the extra attempt before the Pacific reset', async () => {
     const failedRuns = Array.from({ length: MAX_FAILED_IMPORTS_PER_DAY }, () => ({
-      status: 'completed', conclusion: 'failure', created_at: '2026-09-28T05:38:02Z',
+      status: 'completed', conclusion: 'failure', updated_at: '2026-09-28T05:41:29Z',
     }))
     const fetchMock = github({ menu: publication('2026-09-24'), completedImports: failedRuns })
     await expect(checkAndRecover(new Date('2026-09-28T06:52:00Z'), env(), fetchMock))
