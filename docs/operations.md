@@ -14,12 +14,16 @@ database, analytics, payment SDK, hosted font, or order-submission endpoint.
 3. Run **Deploy GitHub Pages** once from the Actions tab. After that, successful
    menu commits deploy automatically.
 
-Production is pinned to `gemini-3.8-flash` with low thinking and high per-image
-resolution. The same configuration is used for extraction, blind verification,
-and focused re-inspection, without deprecated sampling parameters. Manual
-benchmarks retain the former 3.6 control and the other exact free-allowlisted
-configurations. The importer sends only the already-public restaurant menu image
-to Gemini. It never receives visitor names, selections, or browser data.
+Production starts with `gemini-3.8-flash` at low thinking and high per-image
+resolution. If its bounded retries end in Gemini 429, 500, 502, 503, or 504,
+the same import tries `gemini-3.7-flash` with those settings, then
+`gemini-3.6-flash` with its former production request shape. A successful
+fallback remains selected for later passes on that image. Permanent API errors,
+malformed responses, and transcription uncertainty do not trigger model
+fallback. All three exact models use the same billing-disabled free-tier project;
+there is no paid fallback. Manual benchmarks still test each configuration
+separately. The importer sends only the already-public restaurant menu image to
+Gemini. It never receives visitor names, selections, or browser data.
 
 ## Daily behavior
 
@@ -49,6 +53,8 @@ It does not average, infer, or merge conflicting values. A failed, uncertain, or
 third distinct result remains rejected and all available evidence is saved for
 manual review. Benchmark runs intentionally skip this recovery so they continue
 to measure the configured pair of model passes against the human reference.
+Published validation records identify the models that produced the agreeing
+transcripts; dry-run and review reports list the model used for each pass.
 
 Once today's menu is ready, later scheduled runs exit before opening Facebook or
 calling Gemini. A changed, fully validated menu is committed to `data/menus/` and

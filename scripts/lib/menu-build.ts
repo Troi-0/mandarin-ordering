@@ -5,7 +5,7 @@ import {
   PAGE_ID,
   type Menu,
 } from '../../src/lib/menu-schema.ts'
-import { FREE_GEMINI_MODEL, type ExtractedMenu } from './gemini.ts'
+import { FREE_GEMINI_MODEL, type ExtractedMenu, type FreeGeminiModel } from './gemini.ts'
 
 interface MenuBuildOptions {
   date: string
@@ -15,6 +15,8 @@ interface MenuBuildOptions {
   image: Uint8Array
   method: 'facebook' | 'manual'
   extracted: ExtractedMenu
+  extractionModel?: FreeGeminiModel
+  verificationModel?: FreeGeminiModel
   verificationMethod?: 'blind-transcription' | 'focused-consensus'
 }
 
@@ -67,7 +69,7 @@ function menuRecord(
 
 export function reviewMenuFromExtraction(options: MenuBuildOptions): ReviewMenu {
   return menuRecord(options, {
-    extractedBy: FREE_GEMINI_MODEL,
+    extractedBy: options.extractionModel ?? FREE_GEMINI_MODEL,
     verifiedBy: 'human-review-required',
     uncertain: true,
   }) as ReviewMenu
@@ -75,8 +77,8 @@ export function reviewMenuFromExtraction(options: MenuBuildOptions): ReviewMenu 
 
 export function menuFromExtraction(options: MenuBuildOptions): Menu {
   const menu = menuSchema.parse(menuRecord(options, {
-    extractedBy: FREE_GEMINI_MODEL,
-    verifiedBy: `${FREE_GEMINI_MODEL}:${options.verificationMethod ?? 'blind-transcription'}`,
+    extractedBy: options.extractionModel ?? FREE_GEMINI_MODEL,
+    verifiedBy: `${options.verificationModel ?? FREE_GEMINI_MODEL}:${options.verificationMethod ?? 'blind-transcription'}`,
     uncertain: false,
   }))
   assertMenuInvariants(menu)

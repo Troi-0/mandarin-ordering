@@ -36,8 +36,12 @@
   when all three failed runs on that Sofia day completed before the reset.
   The additional attempt stays within the existing Sofia publishing window.
   A fourth failure closes the import budget for that day.
+- After bounded Gemini 3.8 availability retries, try 3.7 Flash, then 3.6
+  Flash on the same free-tier key. Keep a successful fallback for the remaining
+  transcription passes and record the actual models used. The two independent
+  passes and fail-closed agreement gate still control publication.
 
 Google documents that requests-per-day quotas reset at midnight Pacific and
-that model capacity and active limits can vary. The scheduler change allows
-bounded recovery after a reset. It cannot eliminate upstream 503 responses;
-the fail-closed transcription gate remains in force.
+that model capacity and active limits can vary. The scheduler retry and model
+fallback improve recovery, but cannot guarantee capacity or bypass a project
+quota. The fail-closed transcription gate remains in force.

@@ -5,11 +5,13 @@ import {
   comparePriceBenchmark,
   compareTranscriptData,
   compareTranscriptions,
+  createProductionGeminiSession,
   extractMenu,
   resolveMenu,
   transcriptionHasUncertainty,
   verifyMenu,
   type ExtractedMenu,
+  type FreeGeminiModel,
   type Verification,
 } from './gemini.ts'
 import {
@@ -58,6 +60,12 @@ interface ResolutionEvidence {
   error?: string
 }
 
+interface ModelEvidence {
+  extraction: FreeGeminiModel
+  verification: FreeGeminiModel
+  resolution?: FreeGeminiModel
+}
+
 export function referenceTranscript(reference: Menu): ExtractedMenu {
   return {
     uncertain: false,
@@ -93,13 +101,18 @@ export function createMenuImporter(options: MenuImporterOptions) {
     extracted: ExtractedMenu,
     verificationTranscript: ExtractedMenu,
     verification: Verification,
+    models: ModelEvidence,
     benchmark?: Verification,
     resolution?: ResolutionEvidence,
   ): Promise<void> {
     const outputPath = options.dryRun
       ? reportPath()
       : path.join(options.root, 'data', 'review', `${source.date}.json`)
-    const editableMenu = reviewMenuFromExtraction({ ...source, extracted })
+    const editableMenu = reviewMenuFromExtraction({
+      ...source,
+      extracted,
+      extractionModel: models.extraction,
+    })
     await mkdir(path.dirname(outputPath), { recursive: true })
     await writeFile(
       outputPath,
@@ -110,6 +123,7 @@ export function createMenuImporter(options: MenuImporterOptions) {
         extracted,
         verificationTranscript,
         verification,
+        models,
         ...(benchmark ? { benchmark } : {}),
         ...(resolution ? { resolution } : {}),
       }, null, 2)}\n`,
@@ -121,6 +135,7 @@ export function createMenuImporter(options: MenuImporterOptions) {
     extracted: ExtractedMenu,
     verificationTranscript: ExtractedMenu,
     verification: Verification,
+    models: ModelEvidence,
     benchmark?: Verification,
     initialVerification?: Verification,
     resolution?: ResolutionEvidence,
@@ -135,6 +150,7 @@ export function createMenuImporter(options: MenuImporterOptions) {
         extracted,
         verificationTranscript,
         verification,
+        models,
         ...(benchmark ? { benchmark } : {}),
         ...(initialVerification ? { initialVerification } : {}),
         ...(resolution ? { resolution } : {}),
@@ -175,8 +191,15 @@ export function createMenuImporter(options: MenuImporterOptions) {
     if (source.date !== expectedDate) {
       throw new Error(`Fail-closed date check: source is ${source.date}, expected ${expectedDate}`)
     }
-    const extracted = await extract(source.image, source.mimeType)
-    const verificationTranscript = await verify(source.image, source.mimeType)
+    const geminiSession = createProductionGeminiSession()
+    const extractionPass = await geminiSession.run((config) => extract(source.image, source.mimeType, config))
+    const verificationPass = await geminiSession.run((config) => verify(source.image, source.mimeType, config))
+    const extracted = extractionPass.value
+    const verificationTranscript = verificationPass.value
+    const models: ModelEvidence = {
+      extraction: extractionPass.model,
+      verification: verificationPass.model,
+    }
     const initialVerification = compareTranscriptions(extracted, verificationTranscript)
     const benchmarkTranscript = source.benchmarkReference
       ? referenceTranscript(source.benchmarkReference)
@@ -185,13 +208,17 @@ export function createMenuImporter(options: MenuImporterOptions) {
       ? comparePriceBenchmark(extracted, benchmarkTranscript)
       : undefined
     let approvedTranscript = extracted
+    let approvedModel = extractionPass.model
+    let confirmingModel = verificationPass.model
     let verification = initialVerification
     let resolution: ResolutionEvidence | undefined
     let usedFocusedConsensus = false
 
     if (!initialVerification.approved && !benchmark) {
       try {
-        const transcript = await resolve(source.image, source.mimeType)
+        const resolutionPass = await geminiSession.run((config) => resolve(source.image, source.mimeType, config))
+        const transcript = resolutionPass.value
+        models.resolution = resolutionPass.model
         resolution = {
           transcript,
           certain: !transcriptionHasUncertainty(transcript),
@@ -203,6 +230,10 @@ export function createMenuImporter(options: MenuImporterOptions) {
           && (resolution.agreesWithExtraction || resolution.agreesWithVerification)
         ) {
           approvedTranscript = transcript
+          approvedModel = resolutionPass.model
+          confirmingModel = resolution.agreesWithExtraction
+            ? extractionPass.model
+            : verificationPass.model
           verification = { approved: true, uncertain: false, issues: [] }
           usedFocusedConsensus = true
           process.stdout.write('Focused re-inspection reached two-pass menu consensus\n')
@@ -223,6 +254,7 @@ export function createMenuImporter(options: MenuImporterOptions) {
         extracted,
         verificationTranscript,
         initialVerification,
+        models,
         benchmark,
         resolution,
       )
@@ -235,6 +267,8 @@ export function createMenuImporter(options: MenuImporterOptions) {
     const menu = menuFromExtraction({
       ...source,
       extracted: approvedTranscript,
+      extractionModel: approvedModel,
+      verificationModel: confirmingModel,
       verificationMethod: usedFocusedConsensus ? 'focused-consensus' : 'blind-transcription',
     })
     if (options.dryRun) {
@@ -243,6 +277,7 @@ export function createMenuImporter(options: MenuImporterOptions) {
         extracted,
         verificationTranscript,
         verification,
+        models,
         benchmark,
         usedFocusedConsensus ? initialVerification : undefined,
         resolution,

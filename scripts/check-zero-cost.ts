@@ -5,7 +5,7 @@ import {
   assertFreeGeminiConfig,
   FREE_GEMINI_MODELS,
   GEMINI_BENCHMARK_CONFIGS,
-  PRODUCTION_GEMINI_CONFIG,
+  PRODUCTION_GEMINI_CONFIGS,
 } from './lib/gemini.ts'
 
 const root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..')
@@ -21,11 +21,14 @@ const forbiddenPackages = /stripe|openai|firebase|supabase|segment|mixpanel|ampl
 const forbidden = packages.filter((name) => forbiddenPackages.test(name))
 if (forbidden.length) throw new Error(`Cost boundary: forbidden packages found: ${forbidden.join(', ')}`)
 for (const config of GEMINI_BENCHMARK_CONFIGS) assertFreeGeminiConfig(config)
-if (!FREE_GEMINI_MODELS.includes(PRODUCTION_GEMINI_CONFIG.model)) {
-  throw new Error(`Cost boundary: production model is not free-allowlisted: ${PRODUCTION_GEMINI_CONFIG.model}`)
-}
-if (PRODUCTION_GEMINI_CONFIG.model.includes('latest')) {
-  throw new Error('Cost boundary: production must pin an exact stable Gemini model')
+for (const config of PRODUCTION_GEMINI_CONFIGS) {
+  assertFreeGeminiConfig(config)
+  if (!FREE_GEMINI_MODELS.includes(config.model)) {
+    throw new Error(`Cost boundary: production model is not free-allowlisted: ${config.model}`)
+  }
+  if (config.model.includes('latest')) {
+    throw new Error('Cost boundary: production must pin exact stable Gemini models')
+  }
 }
 
 // The scheduler Worker runs on Workers Free. Allow only configuration that Free

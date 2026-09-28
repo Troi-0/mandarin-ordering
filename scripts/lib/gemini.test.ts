@@ -6,11 +6,14 @@ import {
   comparePriceBenchmark,
   compareTranscriptData,
   compareTranscriptions,
+  createProductionGeminiSession,
   extractedMenuSchema,
   GEMINI_BENCHMARK_CONFIGS,
   generateJson,
+  GeminiHttpError,
   normalizeTranscription,
   PRODUCTION_GEMINI_CONFIG,
+  PRODUCTION_GEMINI_CONFIGS,
   resolveMenu,
   type ExtractedMenu,
 } from './gemini.ts'
@@ -41,6 +44,96 @@ async function humanVerifiedTranscript(): Promise<ExtractedMenu> {
 }
 
 describe('blind Gemini transcription comparison', () => {
+  it('falls back through 3.7 and 3.6 only after a model exhausts transient HTTP errors', async () => {
+    const session = createProductionGeminiSession()
+    const attempted: string[] = []
+
+    const extraction = await session.run(async (config) => {
+      attempted.push(`extract:${config.model}`)
+      if (config.model === 'gemini-3.8-flash') throw new GeminiHttpError(503, 'high demand')
+      return 'extracted'
+    })
+    const verification = await session.run(async (config) => {
+      attempted.push(`verify:${config.model}`)
+      if (config.model === 'gemini-3.7-flash') throw new GeminiHttpError(429, 'quota')
+      return 'verified'
+    })
+    const resolution = await session.run(async (config) => {
+      attempted.push(`resolve:${config.model}`)
+      return 'resolved'
+    })
+
+    expect(attempted).toEqual([
+      'extract:gemini-3.8-flash',
+      'extract:gemini-3.7-flash',
+      'verify:gemini-3.7-flash',
+      'verify:gemini-3.6-flash',
+      'resolve:gemini-3.6-flash',
+    ])
+    expect([extraction, verification, resolution]).toEqual([
+      { value: 'extracted', model: 'gemini-3.7-flash' },
+      { value: 'verified', model: 'gemini-3.6-flash' },
+      { value: 'resolved', model: 'gemini-3.6-flash' },
+    ])
+  })
+
+  it('stops after 3.6 and never falls back on permanent or malformed responses', async () => {
+    const attempted: string[] = []
+    const session = createProductionGeminiSession()
+    await expect(session.run(async (config) => {
+      attempted.push(config.model)
+      throw new GeminiHttpError(503, 'high demand')
+    })).rejects.toThrow('Free Gemini request failed (503)')
+    expect(attempted).toEqual(PRODUCTION_GEMINI_CONFIGS.map((config) => config.model))
+
+    const permanentAttempted: string[] = []
+    const permanentSession = createProductionGeminiSession()
+    await expect(permanentSession.run(async (config) => {
+      permanentAttempted.push(config.model)
+      throw new GeminiHttpError(400, 'invalid request')
+    })).rejects.toThrow('Free Gemini request failed (400)')
+    expect(permanentAttempted).toEqual(['gemini-3.8-flash'])
+
+    await expect(createProductionGeminiSession().run(async () => {
+      throw new SyntaxError('invalid JSON')
+    })).rejects.toThrow('invalid JSON')
+  })
+
+  it('sends model-specific request shapes when the API returns persistent 503s', async () => {
+    vi.stubEnv('GEMINI_API_KEY', 'test-key')
+    const fetchMock = vi.fn()
+      .mockResolvedValueOnce(new Response('high demand', { status: 503 }))
+      .mockResolvedValueOnce(new Response('high demand', { status: 503 }))
+      .mockResolvedValueOnce(new Response(JSON.stringify({
+        candidates: [{ content: { parts: [{ text: '{"ok":true}' }] } }],
+      }), { status: 200 }))
+    vi.stubGlobal('fetch', fetchMock)
+
+    const session = createProductionGeminiSession()
+    const result = await session.run((config) => generateJson(
+      'read menu',
+      new Uint8Array([1]),
+      'image/jpeg',
+      {},
+      config,
+      { retryDelaysMs: [] },
+    ))
+
+    expect(result).toEqual({ value: { ok: true }, model: 'gemini-3.6-flash' })
+    expect(fetchMock.mock.calls.map(([url]) => String(url))).toEqual([
+      expect.stringContaining('/gemini-3.8-flash:generateContent'),
+      expect.stringContaining('/gemini-3.7-flash:generateContent'),
+      expect.stringContaining('/gemini-3.6-flash:generateContent'),
+    ])
+    const request37 = JSON.parse(String(fetchMock.mock.calls[1][1].body))
+    expect(request37.generationConfig.thinkingConfig).toEqual({ thinkingLevel: 'low' })
+    expect(request37.contents[0].parts[1].mediaResolution).toEqual({ level: 'MEDIA_RESOLUTION_HIGH' })
+    const request36 = JSON.parse(String(fetchMock.mock.calls[2][1].body))
+    expect(request36.generationConfig.temperature).toBe(0)
+    expect(request36.generationConfig).not.toHaveProperty('thinkingConfig')
+    expect(request36.contents[0].parts[1]).not.toHaveProperty('mediaResolution')
+  })
+
   it('retries the production 3.8 configuration with bounded backoff and no model fallback', async () => {
     vi.useFakeTimers()
     vi.stubEnv('GEMINI_API_KEY', 'test-key')
@@ -222,6 +315,9 @@ describe('blind Gemini transcription comparison', () => {
       .toEqual({ id: 'gemini-3.6-control', model: 'gemini-3.6-flash', temperature: 0 })
     expect(GEMINI_BENCHMARK_CONFIGS.find((config) => config.id === 'gemini-3.8-low-high'))
       .toBe(PRODUCTION_GEMINI_CONFIG)
+    expect(PRODUCTION_GEMINI_CONFIGS.map((config) => config.model)).toEqual([
+      'gemini-3.8-flash', 'gemini-3.7-flash', 'gemini-3.6-flash',
+    ])
     for (const config of GEMINI_BENCHMARK_CONFIGS) {
       expect(() => assertFreeGeminiConfig(config)).not.toThrow()
       expect(config.model).not.toContain('latest')

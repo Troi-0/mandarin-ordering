@@ -8,7 +8,7 @@ import {
   menuSchema,
   type Menu,
 } from '../../src/lib/menu-schema.ts'
-import { compareTranscriptions, extractedMenuSchema, type ExtractedMenu } from './gemini.ts'
+import { compareTranscriptions, extractedMenuSchema, GeminiHttpError, type ExtractedMenu } from './gemini.ts'
 import { createMenuImporter, referenceTranscript } from './import-flow.ts'
 import { imageSha256 } from './menu-build.ts'
 
@@ -118,6 +118,69 @@ describe('menu import orchestration', () => {
     expect(publication.menu.categories.flatMap((category) => category.items).map((item) => item.priceCents))
       .toEqual(transcript.categories.flatMap((category) => category.items).map((item) => item.priceCents))
     expect(() => assertMenuInvariants(publication.menu)).not.toThrow()
+  })
+
+  it('keeps fallback selection across passes and records the actual approving models', async () => {
+    const transcript = await approvedTranscript()
+    const attempts: string[] = []
+    const importer = createMenuImporter({
+      root: testRoot,
+      dryRun: false,
+      now: () => NOW,
+      fetchFacebook: async () => facebookResult(),
+      extract: async (_image, _mimeType, config) => {
+        if (!config) throw new Error('Expected Gemini config')
+        attempts.push(`extract:${config.model}`)
+        if (config.model === 'gemini-3.8-flash') throw new GeminiHttpError(503, 'high demand')
+        return structuredClone(transcript)
+      },
+      verify: async (_image, _mimeType, config) => {
+        if (!config) throw new Error('Expected Gemini config')
+        attempts.push(`verify:${config.model}`)
+        if (config.model === 'gemini-3.7-flash') throw new GeminiHttpError(503, 'high demand')
+        return structuredClone(transcript)
+      },
+    })
+
+    await expect(importer.runFacebook()).resolves.toBe('published')
+    expect(attempts).toEqual([
+      'extract:gemini-3.8-flash',
+      'extract:gemini-3.7-flash',
+      'verify:gemini-3.7-flash',
+      'verify:gemini-3.6-flash',
+    ])
+    const publication = menuPublicationSchema.parse(
+      JSON.parse(await readFile(path.join(testRoot, 'data/current-menu.json'), 'utf8')),
+    )
+    if (publication.status !== 'ready') throw new Error('Expected a ready publication')
+    expect(publication.menu.validation).toEqual({
+      extractedBy: 'gemini-3.7-flash',
+      verifiedBy: 'gemini-3.6-flash:blind-transcription',
+      uncertain: false,
+    })
+  })
+
+  it('leaves current and review data untouched when all fallback models are unavailable', async () => {
+    const attempts: string[] = []
+    const verify = vi.fn(async () => approvedTranscript())
+    const importer = createMenuImporter({
+      root: testRoot,
+      dryRun: false,
+      now: () => NOW,
+      fetchFacebook: async () => facebookResult(),
+      extract: async (_image, _mimeType, config) => {
+        if (!config) throw new Error('Expected Gemini config')
+        attempts.push(config.model)
+        throw new GeminiHttpError(503, 'high demand')
+      },
+      verify,
+    })
+
+    await expect(importer.runFacebook()).rejects.toThrow('Free Gemini request failed (503)')
+    expect(attempts).toEqual(['gemini-3.8-flash', 'gemini-3.7-flash', 'gemini-3.6-flash'])
+    expect(verify).not.toHaveBeenCalled()
+    expect(await pathExists(path.join(testRoot, 'data/current-menu.json'))).toBe(false)
+    expect(await pathExists(path.join(testRoot, `data/review/${TODAY}.json`))).toBe(false)
   })
 
   it('treats a repeated approved import as unchanged without replacing menu data', async () => {
@@ -339,7 +402,10 @@ describe('menu import orchestration', () => {
       fetchFacebook: async () => facebookResult(),
       extract: async () => structuredClone(extracted),
       verify: async () => structuredClone(verificationTranscript),
-      resolve: async () => structuredClone(resolutionTranscript),
+      resolve: async (_image, _mimeType, config) => {
+        if (config?.model === 'gemini-3.8-flash') throw new GeminiHttpError(503, 'high demand')
+        return structuredClone(resolutionTranscript)
+      },
     })
 
     await expect(importer.runFacebook()).resolves.toBe('published')
@@ -349,7 +415,7 @@ describe('menu import orchestration', () => {
     if (publication.status !== 'ready') throw new Error('Expected a ready publication')
     expect(publication.menu.categories[4].items[1].priceCents).toBe(179)
     expect(publication.menu.validation).toEqual({
-      extractedBy: 'gemini-3.8-flash',
+      extractedBy: 'gemini-3.7-flash',
       verifiedBy: 'gemini-3.8-flash:focused-consensus',
       uncertain: false,
     })
