@@ -36,15 +36,10 @@ jobs:
       - run: npm ci
       - name: Compare free stable Gemini configurations on human-verified images
         env:
-          GEMINI_API_KEY: ${{ secrets.GEMINI_BENCHMARK_API_KEY }}
+          GEMINI_API_KEY: ${{ secrets.GEMINI_API_KEY }}
           GEMINI_BENCHMARK_CONFIG: ${{ inputs.configuration }}
           GEMINI_BENCHMARK_REPORT_PATH: ${{ runner.temp }}/gemini-benchmark-report.json
-        run: |
-          if [ -z "$GEMINI_API_KEY" ]; then
-            echo "Configure GEMINI_BENCHMARK_API_KEY from a separate billing-disabled Google project."
-            exit 1
-          fi
-          npm run benchmark:gemini
+        run: npm run benchmark:gemini
       - name: Upload benchmark evidence
         if: always()
         uses: actions/upload-artifact@v7

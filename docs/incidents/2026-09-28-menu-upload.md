@@ -15,6 +15,10 @@
   [run 36416988731](https://github.com/Troi-0/mandarin-ordering/actions/runs/36416988731)
   at 14:39 Sofia, after Google's midnight Pacific reset, still received six
   Gemini 3.8 HTTP 503 high-demand responses. It made no menu or review commit.
+- One further manual
+  [retry 36419222898](https://github.com/Troi-0/mandarin-ordering/actions/runs/36419222898)
+  at 15:02 Sofia received eleven more Gemini 3.8 HTTP 503 responses across its
+  transcription attempts. It also made no menu or review commit.
 - The hosted `current-menu.json` remained dated 2026-09-24. No 2026-09-28 menu
   was published. The browser's Sofia-date gate keeps stale menu data unavailable.
 - On September 27, seven manually dispatched model benchmarks shared the
@@ -25,18 +29,15 @@
 
 ## Repair
 
-- Route benchmarks and manual dry runs through `GEMINI_BENCHMARK_API_KEY`.
-  It must belong to a separate billing-disabled Google project because
-  [Gemini limits are per project](https://ai.google.dev/gemini-api/docs/rate-limits).
-  If that secret is absent, those diagnostic runs fail before a Gemini call;
-  live imports retain the production key.
+- Keep the existing `GEMINI_API_KEY` for live imports, benchmarks, and dry runs.
+  [Google documents limits per project](https://ai.google.dev/gemini-api/docs/rate-limits),
+  so another key in the same project would share its quota.
 - Allow one extra scheduler dispatch after the Pacific daily quota reset only
   when all three failed runs on that Sofia day completed before the reset.
   The additional attempt stays within the existing Sofia publishing window.
   A fourth failure closes the import budget for that day.
 
 Google documents that requests-per-day quotas reset at midnight Pacific and
-that model capacity and active limits can vary. These changes prevent diagnostic
-traffic from consuming the live project's quota and allow bounded recovery
-after a reset. They cannot eliminate upstream 503 responses; the fail-closed
-transcription gate remains in force.
+that model capacity and active limits can vary. The scheduler change allows
+bounded recovery after a reset. It cannot eliminate upstream 503 responses;
+the fail-closed transcription gate remains in force.

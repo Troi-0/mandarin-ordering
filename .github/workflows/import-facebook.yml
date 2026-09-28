@@ -43,24 +43,12 @@ jobs:
         id: importer
         continue-on-error: true
         env:
-          GEMINI_PRODUCTION_API_KEY: ${{ !inputs.dry_run && secrets.GEMINI_API_KEY }}
-          GEMINI_BENCHMARK_API_KEY: ${{ inputs.dry_run && secrets.GEMINI_BENCHMARK_API_KEY }}
+          GEMINI_API_KEY: ${{ secrets.GEMINI_API_KEY }}
           IMPORT_DRY_RUN: ${{ inputs.dry_run }}
           IMPORT_REPORT_PATH: ${{ runner.temp }}/menu-import-report.json
           IMPORT_BENCHMARK_MENU: ${{ inputs.benchmark_reference }}
           IMPORT_BENCHMARK_IMAGE: ${{ inputs.benchmark_image_path }}
-        run: |
-          if [ "$IMPORT_DRY_RUN" = "true" ]; then
-            GEMINI_API_KEY="$GEMINI_BENCHMARK_API_KEY"
-            if [ -z "$GEMINI_API_KEY" ]; then
-              echo "Configure GEMINI_BENCHMARK_API_KEY from a separate billing-disabled Google project for dry runs."
-              exit 1
-            fi
-          else
-            GEMINI_API_KEY="$GEMINI_PRODUCTION_API_KEY"
-          fi
-          export GEMINI_API_KEY
-          npm run import:facebook
+        run: npm run import:facebook
       - name: Upload dry-run report
         if: ${{ always() && inputs.dry_run }}
         uses: actions/upload-artifact@v7
