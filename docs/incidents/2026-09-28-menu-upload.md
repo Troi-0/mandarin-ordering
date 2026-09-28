@@ -19,6 +19,11 @@
   [retry 36419222898](https://github.com/Troi-0/mandarin-ordering/actions/runs/36419222898)
   at 15:02 Sofia received eleven more Gemini 3.8 HTTP 503 responses across its
   transcription attempts. It also made no menu or review commit.
+- After model fallback was deployed, a
+  [live run 36422065419](https://github.com/Troi-0/mandarin-ordering/actions/runs/36422065419)
+  at 15:29 Sofia exhausted Gemini 3.8 retries with HTTP 429, then tried 3.7
+  and 3.6 in order. Both fallback models exhausted HTTP 503 retries during the
+  first transcription. The run made no menu or review commit.
 - The hosted `current-menu.json` remained dated 2026-09-24. No 2026-09-28 menu
   was published. The browser's Sofia-date gate keeps stale menu data unavailable.
 - On September 27, seven manually dispatched model benchmarks shared the
