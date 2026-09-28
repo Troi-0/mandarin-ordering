@@ -154,7 +154,13 @@ const extractionJsonSchema = {
 }
 
 const MAX_VERIFICATION_ISSUES = 100
-const TRANSIENT_RETRY_DELAYS_MS = [5_000, 10_000, 20_000, 40_000, 60_000]
+export const PRODUCTION_GEMINI_RETRY_DELAYS_MS: readonly number[] = Object.freeze([
+  5_000,
+  10_000,
+  20_000,
+  40_000,
+  ...Array<number>(16).fill(60_000),
+])
 const MAX_RETRY_AFTER_MS = 120_000
 const TRANSIENT_HTTP_STATUSES = new Set([408, 429, 500, 502, 503, 504])
 const FALLBACK_HTTP_STATUSES = new Set([429, 500, 502, 503, 504])
@@ -259,6 +265,23 @@ function retryAfterMs(response: Response): number | undefined {
   return Math.min(Math.max(0, retryAt - Date.now()), MAX_RETRY_AFTER_MS)
 }
 
+function isDailyQuotaExceeded(body: string): boolean {
+  try {
+    const payload = JSON.parse(body) as {
+      error?: {
+        details?: Array<{
+          violations?: Array<{ quotaId?: string }>
+        }>
+      }
+    }
+    return payload.error?.details?.some((detail) => detail.violations?.some(
+      (violation) => violation.quotaId?.includes('PerDay'),
+    )) ?? false
+  } catch {
+    return false
+  }
+}
+
 function transientDelayMs(
   response: Response | undefined,
   retryIndex: number,
@@ -280,7 +303,7 @@ export async function generateJson(
   policy: GeminiRequestPolicy = {},
 ): Promise<unknown> {
   assertFreeGeminiConfig(config)
-  const retryDelaysMs = policy.retryDelaysMs ?? TRANSIENT_RETRY_DELAYS_MS
+  const retryDelaysMs = policy.retryDelaysMs ?? PRODUCTION_GEMINI_RETRY_DELAYS_MS
   const timeoutMs = policy.timeoutMs ?? 90_000
   const imagePart: Record<string, unknown> = {
     inlineData: { mimeType, data: Buffer.from(image).toString('base64') },
@@ -338,6 +361,7 @@ export async function generateJson(
     if (response.ok) break
     const body = await response.text()
     const canRetry = TRANSIENT_HTTP_STATUSES.has(response.status)
+      && !(response.status === 429 && isDailyQuotaExceeded(body))
       && attempt < retryDelaysMs.length
     if (!canRetry) {
       throw new GeminiHttpError(response.status, body)

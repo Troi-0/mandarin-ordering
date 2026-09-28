@@ -14,6 +14,7 @@ import {
   normalizeTranscription,
   PRODUCTION_GEMINI_CONFIG,
   PRODUCTION_GEMINI_CONFIGS,
+  PRODUCTION_GEMINI_RETRY_DELAYS_MS,
   resolveMenu,
   type ExtractedMenu,
 } from './gemini.ts'
@@ -164,6 +165,63 @@ describe('blind Gemini transcription comparison', () => {
       expect(request.generationConfig).not.toHaveProperty('topP')
       expect(request.generationConfig).not.toHaveProperty('topK')
     }
+  })
+
+  it('allows up to 20 retries per model before falling back', async () => {
+    vi.useFakeTimers()
+    vi.stubEnv('GEMINI_API_KEY', 'test-key')
+    vi.spyOn(Math, 'random').mockReturnValue(0.5)
+    const fetchMock = vi.fn(async () => new Response('high demand', { status: 503 }))
+    vi.stubGlobal('fetch', fetchMock)
+
+    expect(PRODUCTION_GEMINI_RETRY_DELAYS_MS).toHaveLength(20)
+    expect(PRODUCTION_GEMINI_RETRY_DELAYS_MS.slice(0, 5)).toEqual([
+      5_000, 10_000, 20_000, 40_000, 60_000,
+    ])
+    const result = generateJson('read menu', new Uint8Array([1]), 'image/jpeg', {})
+    const rejection = expect(result).rejects.toThrow('Free Gemini request failed (503)')
+    await vi.runAllTimersAsync()
+    await rejection
+
+    expect(fetchMock).toHaveBeenCalledTimes(21)
+  })
+
+  it('skips remaining retries when Google explicitly reports a per-day quota', async () => {
+    vi.stubEnv('GEMINI_API_KEY', 'test-key')
+    const fetchMock = vi.fn(async () => new Response(JSON.stringify({
+      error: {
+        details: [{
+          violations: [{ quotaId: 'GenerateRequestsPerDayPerProjectPerModel-FreeTier' }],
+        }],
+      },
+    }), { status: 429 }))
+    vi.stubGlobal('fetch', fetchMock)
+
+    await expect(generateJson('read menu', new Uint8Array([1]), 'image/jpeg', {}))
+      .rejects.toThrow('Free Gemini request failed (429)')
+    expect(fetchMock).toHaveBeenCalledOnce()
+  })
+
+  it('continues retrying a short-window 429', async () => {
+    vi.useFakeTimers()
+    vi.stubEnv('GEMINI_API_KEY', 'test-key')
+    const fetchMock = vi.fn()
+      .mockResolvedValueOnce(new Response(JSON.stringify({
+        error: {
+          details: [{
+            violations: [{ quotaId: 'GenerateRequestsPerMinutePerProjectPerModel-FreeTier' }],
+          }],
+        },
+      }), { status: 429 }))
+      .mockResolvedValueOnce(new Response(JSON.stringify({
+        candidates: [{ content: { parts: [{ text: '{"ok":true}' }] } }],
+      }), { status: 200 }))
+    vi.stubGlobal('fetch', fetchMock)
+
+    const result = generateJson('read menu', new Uint8Array([1]), 'image/jpeg', {})
+    await vi.runAllTimersAsync()
+    await expect(result).resolves.toEqual({ ok: true })
+    expect(fetchMock).toHaveBeenCalledTimes(2)
   })
 
   it('honors Retry-After when it is longer than the exponential delay', async () => {

@@ -39,9 +39,11 @@ that package once with `npm ci --prefix workers/menu-scheduler`.
 - Both commands require `GEMINI_API_KEY`. The Google AI project must remain on
   the free tier with billing disabled; there is no paid fallback.
 - Transient Gemini and network failures use bounded exponential backoff with
-  jitter and `Retry-After` support. After exhausted Gemini 429 or supported 5xx
-  retries, one import falls back from 3.8 Flash to 3.7 Flash, then 3.6 Flash. The
-  independent verification gate still decides whether to publish.
+  jitter and `Retry-After` support, with at most 20 retries per model. A
+  confirmed daily-quota 429 moves to the next model immediately. After exhausted
+  availability retries, one import falls back from 3.8 Flash to 3.7 Flash,
+  then 3.6 Flash. The independent verification gate still decides whether to
+  publish.
 - If the two full-image passes disagree or flag uncertainty, one focused close
   inspection may recover the menu only when it is certain and exactly matches
   one earlier pass on structure, portions, and every price. Otherwise a draft

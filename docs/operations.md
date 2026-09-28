@@ -15,7 +15,9 @@ database, analytics, payment SDK, hosted font, or order-submission endpoint.
    menu commits deploy automatically.
 
 Production starts with `gemini-3.8-flash` at low thinking and high per-image
-resolution. If its bounded retries end in Gemini 429, 500, 502, 503, or 504,
+resolution. Each model can retry a transient request up to 20 times. A 429 that
+explicitly reports a per-day quota skips the remaining retries for that model.
+If the retries end in Gemini 429, 500, 502, 503, or 504,
 the same import tries `gemini-3.7-flash` with those settings, then
 `gemini-3.6-flash` with its former production request shape. A successful
 fallback remains selected for later passes on that image. Permanent API errors,
@@ -382,9 +384,9 @@ and per-image ultra-high resolution. The 3.8 low/high choice is also the current
 production configuration. Separate, short runs keep free-tier demand
 failures attributable to the exact candidate. Benchmark calls do not retry so
 availability problems are measured without blocking the full matrix; production
-calls retain five bounded retries. Candidate model IDs are exact and allowlisted;
-the workflow has read-only repository permission, cannot publish menu data, and
-never changes the scheduled production configuration.
+calls retain up to 20 bounded retries per model. Candidate model IDs are exact
+and allowlisted; the workflow has read-only repository permission, cannot
+publish menu data, and never changes the scheduled production configuration.
 
 The uploaded `gemini-benchmark-<run id>` report retains both raw transcripts,
 elapsed time, human-reference comparisons for both passes, the existing blind
@@ -475,10 +477,13 @@ before assuming the importer is at fault.
 - If Facebook markup becomes unreadable, Gemini is unavailable, the free quota is
   exhausted, or focused consensus cannot safely resolve uncertain extraction, the
   workflow fails without replacing the menu.
-- Direct Gemini calls retry transient network failures plus 408, 429, and 5xx
-  responses at most five times with bounded exponential backoff, jitter, and
-  `Retry-After` support. They never switch models or paid service tiers;
-  permanent errors and exhausted retries still fail closed.
+- Production Gemini calls retry transient network failures plus 408, 429, and
+  supported 5xx responses at most 20 times per model with bounded exponential
+  backoff, jitter, and `Retry-After` support. A structured per-day quota 429
+  moves to the next free model without further calls to that model. Benchmarks
+  remain fail-fast; permanent errors and exhausted fallback models fail closed.
+  The import jobs allow up to four hours so their configured retry sequence can
+  complete even when responses approach the per-request timeout.
 - The scheduler stops after three failed live imports on a Sofia day. When all
   three completed before Google's midnight Pacific daily quota reset, it
   allows exactly one additional attempt after the reset within its normal Sofia

@@ -38,7 +38,7 @@ if (configs.length === 0) {
   throw new Error(`Unknown GEMINI_BENCHMARK_CONFIG: ${requestedConfigId}`)
 }
 // Benchmarks should expose availability problems without spending minutes on
-// each candidate. Production requests retain their five bounded retries.
+// each candidate. Production requests retain their 20 bounded retries.
 const benchmarkRequestPolicy: GeminiRequestPolicy = Object.freeze({
   retryDelaysMs: [],
   timeoutMs: 90_000,

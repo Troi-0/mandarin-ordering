@@ -45,6 +45,9 @@
   Flash on the same free-tier key. Keep a successful fallback for the remaining
   transcription passes and record the actual models used. The two independent
   passes and fail-closed agreement gate still control publication.
+- Allow up to 20 retries per model for transient failures, while moving on
+  immediately when a structured 429 response identifies a per-day quota.
+  Extend the GitHub import job timeout so all configured retries can finish.
 
 Google documents that requests-per-day quotas reset at midnight Pacific and
 that model capacity and active limits can vary. The scheduler retry and model

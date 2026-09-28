@@ -24,6 +24,7 @@ describe('GitHub workflow contracts', () => {
     expect(importer).toContain('workflow_dispatch:')
     expect(importer).not.toContain('schedule:')
     expect(importer).toContain('contents: write\n  actions: read')
+    expect(importer).toContain('timeout-minutes: 240')
     expect(importer).toContain('GEMINI_API_KEY: ${{ secrets.GEMINI_API_KEY }}')
     expect(importer).not.toContain('GEMINI_BENCHMARK_API_KEY')
     expect(importer).toContain('IMPORT_DRY_RUN: ${{ inputs.dry_run }}')
@@ -47,6 +48,7 @@ describe('GitHub workflow contracts', () => {
 
     expect(importer).toContain('manual-inbox/*.png')
     expect(importer).toContain('contents: write\n  actions: read')
+    expect(importer).toContain('timeout-minutes: 240')
     expect(importer).toContain('GEMINI_API_KEY: ${{ secrets.GEMINI_API_KEY }}')
     expect(importer).not.toContain('GEMINI_BENCHMARK_API_KEY')
     expect(importer).toContain("IMPORT_DRY_RUN: ${{ github.event_name == 'workflow_dispatch' && inputs.dry_run }}")
