@@ -1,0 +1,310 @@
+{
+  "date": "2026-09-28",
+  "restaurant": "Mandarin House",
+  "currency": "EUR",
+  "source": {
+    "pageId": "100063668642218",
+    "postId": "1733757148756557",
+    "postUrl": "https://www.facebook.com/permalink.php?story_fbid=1733757148756557&id=100063668642218",
+    "publishedAt": "2026-09-28T05:30:04.000Z",
+    "imageSha256": "c5f3132fe3e2efa51506334dbd312213ce13f6ade519f46317b684930fd98316"
+  },
+  "importedAt": "2026-09-28T12:56:23.455Z",
+  "importMethod": "facebook",
+  "validation": {
+    "extractedBy": "gemini-3.7-flash",
+    "verifiedBy": "gemini-3.7-flash:blind-transcription",
+    "uncertain": false
+  },
+  "categories": [
+    {
+      "id": "category-d9a40893b767",
+      "name": "СУПИ",
+      "items": [
+        {
+          "id": "item-daf19079f034",
+          "name": "Пилешка супа",
+          "portion": "350 мл",
+          "priceCents": 270
+        },
+        {
+          "id": "item-b1e896d140d0",
+          "name": "Картофена крем супа с пушено сирене",
+          "portion": "350 мл",
+          "priceCents": 270
+        },
+        {
+          "id": "item-27bd3994ec83",
+          "name": "Таратор",
+          "portion": "350 мл",
+          "priceCents": 180
+        }
+      ]
+    },
+    {
+      "id": "category-9b49ec89c925",
+      "name": "ОСНОВНИ",
+      "items": [
+        {
+          "id": "item-bcf8c52dd48c",
+          "name": "Панирано пилешко филе Панко, с гарнитура",
+          "portion": "350 г",
+          "priceCents": 510
+        },
+        {
+          "id": "item-fb8cc91fbba5",
+          "name": "Късчета от пилешко филе с къри сос, с гарнитура ориз",
+          "portion": "350 г",
+          "priceCents": 510
+        },
+        {
+          "id": "item-aad67874b595",
+          "name": "Запечено свинско джоланче, с картофено пюре",
+          "portion": "400 г",
+          "priceCents": 490
+        },
+        {
+          "id": "item-57b874644402",
+          "name": "Свинско печено /врат/ със сметанов сос с пушено сирене, с гарнитура",
+          "portion": "350 г",
+          "priceCents": 510
+        },
+        {
+          "id": "item-441332821763",
+          "name": "Талиатели Болонезе с пармезан",
+          "portion": "350 г",
+          "priceCents": 470
+        },
+        {
+          "id": "item-1c595215e2e6",
+          "name": "Телешки кюфтета блек ангъс /2 бр/ на скара, с ½ пърленка, тирокафтери и гарнитура",
+          "portion": "350 г",
+          "priceCents": 610
+        },
+        {
+          "id": "item-afb0526d1d22",
+          "name": "Кюфтета от тиквички с моцарела , с млечен сос и гарнитура",
+          "portion": "350 г",
+          "priceCents": 440
+        },
+        {
+          "id": "item-0c2e35ef2365",
+          "name": "Лазаня четири сирена",
+          "portion": "350 г",
+          "priceCents": 460
+        },
+        {
+          "id": "item-0ef35fe72ac0",
+          "name": "Ориз с коприва и домати на фурна",
+          "portion": "350 г",
+          "priceCents": 420
+        },
+        {
+          "id": "item-a5ddabb763a0",
+          "name": "Филе от сьомга с билки на фурна, с гарнитура",
+          "portion": "350 г",
+          "priceCents": 810
+        }
+      ]
+    },
+    {
+      "id": "category-93e781090211",
+      "name": "СКАРА",
+      "items": [
+        {
+          "id": "item-305d84418e80",
+          "name": "Мариновани свински ребърца на скара",
+          "portion": "200 г",
+          "priceCents": 360
+        },
+        {
+          "id": "item-f616d12ef63e",
+          "name": "Кралски котлет с цяло ребро на скара",
+          "portion": "300 г",
+          "priceCents": 660
+        },
+        {
+          "id": "item-6df823c8aaff",
+          "name": "Пилешко филе на скара",
+          "portion": "130 г",
+          "priceCents": 330
+        },
+        {
+          "id": "item-727d5e7d3b97",
+          "name": "Пържола от пилешко бутче на скара",
+          "portion": "150 г",
+          "priceCents": 340
+        },
+        {
+          "id": "item-addc822868b7",
+          "name": "Шишче от пилешко филе със зеленчуци",
+          "portion": "100 г",
+          "priceCents": 190
+        },
+        {
+          "id": "item-f2baea0819ee",
+          "name": "Кюфте/Кебапче на скара",
+          "portion": "100 г",
+          "priceCents": 120
+        },
+        {
+          "id": "item-288472690313",
+          "name": "Домашен конски суджук на скара",
+          "portion": "200 г",
+          "priceCents": 470
+        }
+      ]
+    },
+    {
+      "id": "category-07157351ae13",
+      "name": "ГАРНИТУРИ",
+      "items": [
+        {
+          "id": "item-56d514c6508a",
+          "name": "Пържени уеджис картофки",
+          "portion": "100 г",
+          "priceCents": 92
+        },
+        {
+          "id": "item-279d47cf9f93",
+          "name": "Печени картофки на фурна",
+          "portion": "100 г",
+          "priceCents": 92
+        },
+        {
+          "id": "item-74e6f4dcd227",
+          "name": "Задушени зеленчуци",
+          "portion": "100 г",
+          "priceCents": 92
+        },
+        {
+          "id": "item-8e47887197f8",
+          "name": "Задушен ориз",
+          "portion": "100 г",
+          "priceCents": 92
+        },
+        {
+          "id": "item-22f10436a2bc",
+          "name": "Картофено пюре",
+          "portion": "100 г",
+          "priceCents": 92
+        }
+      ]
+    },
+    {
+      "id": "category-2069b35e18f8",
+      "name": "ДЕСЕРТ",
+      "items": [
+        {
+          "id": "item-b695501b06da",
+          "name": "Макарони на фурна",
+          "priceCents": 180
+        },
+        {
+          "id": "item-15fd4914ce66",
+          "name": "Френска селска торта",
+          "priceCents": 290
+        },
+        {
+          "id": "item-8f0b7d691665",
+          "name": "Мляко с ориз и канела",
+          "priceCents": 179
+        },
+        {
+          "id": "item-f6862696c86d",
+          "name": "Протеинов шоколадов мус",
+          "priceCents": 290
+        },
+        {
+          "id": "item-402baa5c0005",
+          "name": "Млечен пудинг с чиа и плодове",
+          "priceCents": 205
+        }
+      ]
+    },
+    {
+      "id": "category-b8dbd6030c22",
+      "name": "САЛАТИ",
+      "items": [
+        {
+          "id": "item-aefc667c8370",
+          "name": "Шопска салата/единично опакована/",
+          "portion": "350 г",
+          "priceCents": 302
+        },
+        {
+          "id": "item-93c7cc2c55f4",
+          "name": "Сала Капрезе с моцарела и песто",
+          "portion": "300 г",
+          "priceCents": 450
+        },
+        {
+          "id": "item-987860330cb3",
+          "name": "Салата от краставици, репички, царевица и сирене",
+          "portion": "100 г",
+          "priceCents": 92
+        },
+        {
+          "id": "item-9fc63690f1d7",
+          "name": "Салата от мариновани печени чушки",
+          "portion": "100 г",
+          "priceCents": 92
+        },
+        {
+          "id": "item-c964e3e49d3a",
+          "name": "Салата табуле",
+          "portion": "100 г",
+          "priceCents": 92
+        },
+        {
+          "id": "item-4fab8172bc4d",
+          "name": "Салата домати и краставици",
+          "portion": "100 г",
+          "priceCents": 92
+        },
+        {
+          "id": "item-f4363ddba961",
+          "name": "Зелена салата с краставици и репички",
+          "portion": "100 г",
+          "priceCents": 92
+        },
+        {
+          "id": "item-c5d939444790",
+          "name": "Салата моркови със семена",
+          "portion": "100 г",
+          "priceCents": 92
+        },
+        {
+          "id": "item-6eb5ddd7eade",
+          "name": "Салата зеле и моркови",
+          "portion": "100 г",
+          "priceCents": 92
+        },
+        {
+          "id": "item-a35da0fe5371",
+          "name": "Картофена салата",
+          "portion": "100 г",
+          "priceCents": 92
+        },
+        {
+          "id": "item-830ef2d78b81",
+          "name": "Салата Тирокафтери",
+          "portion": "50 г",
+          "priceCents": 80
+        },
+        {
+          "id": "item-93488dd664a6",
+          "name": "Салата Дзадзики",
+          "portion": "50 г",
+          "priceCents": 80
+        },
+        {
+          "id": "item-bc202fb79104",
+          "name": "Домашна лютеничка",
+          "portion": "50 г",
+          "priceCents": 51
+        }
+      ]
+    }
+  ]
+}
