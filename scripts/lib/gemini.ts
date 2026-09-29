@@ -23,6 +23,11 @@ export interface GeminiRequestPolicy {
   timeoutMs?: number
 }
 
+export interface GeminiImagePart {
+  inlineData: { mimeType: string; data: string }
+  mediaResolution?: { level: 'MEDIA_RESOLUTION_HIGH' | 'MEDIA_RESOLUTION_ULTRA_HIGH' }
+}
+
 export const PRODUCTION_GEMINI_CONFIG: GeminiConfig = Object.freeze({
   id: 'gemini-3.8-low-high',
   model: 'gemini-3.8-flash',
@@ -294,6 +299,24 @@ function transientDelayMs(
   return Math.max(jitteredDelay, response ? (retryAfterMs(response) ?? 0) : 0)
 }
 
+export function buildGeminiImagePart(
+  image: Uint8Array,
+  mimeType: string,
+  config: GeminiConfig = PRODUCTION_GEMINI_CONFIG,
+): GeminiImagePart {
+  const imagePart: GeminiImagePart = {
+    inlineData: { mimeType, data: Buffer.from(image).toString('base64') },
+  }
+  if (config.mediaResolution) {
+    imagePart.mediaResolution = {
+      level: config.mediaResolution === 'ultra-high'
+        ? 'MEDIA_RESOLUTION_ULTRA_HIGH'
+        : 'MEDIA_RESOLUTION_HIGH',
+    }
+  }
+  return imagePart
+}
+
 export async function generateJson(
   prompt: string,
   image: Uint8Array,
@@ -305,16 +328,7 @@ export async function generateJson(
   assertFreeGeminiConfig(config)
   const retryDelaysMs = policy.retryDelaysMs ?? PRODUCTION_GEMINI_RETRY_DELAYS_MS
   const timeoutMs = policy.timeoutMs ?? 90_000
-  const imagePart: Record<string, unknown> = {
-    inlineData: { mimeType, data: Buffer.from(image).toString('base64') },
-  }
-  if (config.mediaResolution) {
-    imagePart.mediaResolution = {
-      level: config.mediaResolution === 'ultra-high'
-        ? 'MEDIA_RESOLUTION_ULTRA_HIGH'
-        : 'MEDIA_RESOLUTION_HIGH',
-    }
-  }
+  const imagePart = buildGeminiImagePart(image, mimeType, config)
   const generationConfig: Record<string, unknown> = {
     responseMimeType: 'application/json',
     responseSchema,

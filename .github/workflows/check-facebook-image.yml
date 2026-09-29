@@ -1,0 +1,25 @@
+name: Check Facebook image resolution
+
+on:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  check:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v6
+      - uses: actions/setup-node@v6
+        with:
+          node-version: 24
+          cache: npm
+      - run: npm ci
+      - run: npx playwright install --with-deps chromium
+      - name: Fetch and inspect the public menu image
+        run: |
+          npx tsx scripts/check-facebook-image.ts "$RUNNER_TEMP/facebook-menu-image"
+          file "$RUNNER_TEMP/facebook-menu-image"
+          sha256sum "$RUNNER_TEMP/facebook-menu-image"

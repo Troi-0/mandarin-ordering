@@ -3,6 +3,7 @@ import { afterEach, describe, expect, it, vi } from 'vitest'
 import { menuSchema } from '../../src/lib/menu-schema.ts'
 import {
   assertFreeGeminiConfig,
+  buildGeminiImagePart,
   comparePriceBenchmark,
   compareTranscriptData,
   compareTranscriptions,
@@ -45,6 +46,15 @@ async function humanVerifiedTranscript(): Promise<ExtractedMenu> {
 }
 
 describe('blind Gemini transcription comparison', () => {
+  it('places the original image bytes in the production payload without resizing', () => {
+    const image = new Uint8Array([0xff, 0xd8, 0x12, 0x34, 0xff, 0xd9])
+    const part = buildGeminiImagePart(image, 'image/jpeg')
+
+    expect(Buffer.from(part.inlineData.data, 'base64')).toEqual(Buffer.from(image))
+    expect(part.inlineData.mimeType).toBe('image/jpeg')
+    expect(part.mediaResolution).toEqual({ level: 'MEDIA_RESOLUTION_HIGH' })
+  })
+
   it('falls back through 3.7 and 3.6 only after a model exhausts transient HTTP errors', async () => {
     const session = createProductionGeminiSession()
     const attempted: string[] = []
