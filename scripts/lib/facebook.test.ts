@@ -2,6 +2,7 @@ import type { Page } from 'playwright'
 import { describe, expect, it, vi } from 'vitest'
 import { PAGE_ID } from '../../src/lib/menu-schema.ts'
 import {
+  extractLargerFeedImage,
   extractLargerViewerImage,
   extractTargetedPermalinkImage,
   inspectFacebookFeed,
@@ -192,6 +193,37 @@ describe('Facebook embedded post parsing', () => {
       JSON.stringify(viewer('777', full, 1444, 2048)),
       JSON.stringify(viewer('777', 'https://scontent.example.fbcdn.net/other.jpg', 1444, 2048)),
     ], candidate)).toBeUndefined()
+  })
+
+  it('finds a larger feed Photo image only when its ID matches the attached photo', () => {
+    const candidate = {
+      postId: '444',
+      creationTime: 400,
+      postUrl: `https://www.facebook.com/permalink.php?story_fbid=444&id=${PAGE_ID}`,
+      imageUrl: 'https://scontent.example.fbcdn.net/feed.jpg',
+      photoId: '777',
+      imageWidth: 508,
+      imageHeight: 720,
+    }
+    const full = 'https://scontent.example.fbcdn.net/full.jpg'
+    const feedPhoto = (id: string, uri: string, width: number, height: number) => ({
+      __typename: 'Photo', id, viewer_image: { uri, width, height },
+    })
+
+    expect(extractLargerFeedImage([feed(
+      feedPhoto('999', 'https://scontent.example.fbcdn.net/wrong.jpg', 4000, 5000),
+      feedPhoto('777', full, 1444, 2048),
+    )], candidate)).toEqual({ imageUrl: full, width: 1444, height: 2048 })
+    expect(extractLargerFeedImage([feed(feedPhoto('777', full, 508, 720))], candidate))
+      .toBeUndefined()
+    expect(extractLargerFeedImage([feed(feedPhoto('777', full, 400, 2048))], candidate))
+      .toBeUndefined()
+    expect(extractLargerFeedImage([feed(feedPhoto('777', 'https://example.com/full.jpg', 1444, 2048))], candidate))
+      .toBeUndefined()
+    expect(extractLargerFeedImage([feed(
+      feedPhoto('777', full, 1444, 2048),
+      feedPhoto('777', 'https://scontent.example.fbcdn.net/other.jpg', 1444, 2048),
+    )], candidate)).toBeUndefined()
   })
 
   it('supports direct legacy Page author fields', () => {

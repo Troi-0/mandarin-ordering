@@ -316,11 +316,23 @@ interface ViewerImage {
   height: number
 }
 
-export function extractLargerViewerImage(
+function largerImage(image: unknown, candidate: FacebookStoryCandidate): ViewerImage | undefined {
+  if (!isRecord(image) || !candidate.imageWidth || !candidate.imageHeight) return undefined
+  if (typeof image.uri !== 'string' || !isFacebookCdnUrl(image.uri)) return undefined
+  if (!Number.isSafeInteger(image.width) || !Number.isSafeInteger(image.height)) return undefined
+  const width = Number(image.width)
+  const height = Number(image.height)
+  if (width < candidate.imageWidth || height < candidate.imageHeight) return undefined
+  if (width === candidate.imageWidth && height === candidate.imageHeight) return undefined
+  return { imageUrl: image.uri, width, height }
+}
+
+function selectExactPhotoImage(
   jsonScripts: readonly string[],
   candidate: FacebookStoryCandidate,
+  imageFromRecord: (record: JsonRecord) => unknown,
 ): ViewerImage | undefined {
-  if (!candidate.photoId || !candidate.imageWidth || !candidate.imageHeight) return undefined
+  if (!candidate.photoId) return undefined
   let selected: ViewerImage | undefined
 
   for (const source of jsonScripts) {
@@ -331,16 +343,8 @@ export function extractLargerViewerImage(
       continue
     }
     for (const record of recordsIn(parsed)) {
-      const media = record.currMedia
-      if (!isRecord(media) || media.id !== candidate.photoId || !isRecord(media.image)) continue
-      const image = media.image
-      if (typeof image.uri !== 'string' || !isFacebookCdnUrl(image.uri)) continue
-      if (!Number.isSafeInteger(image.width) || !Number.isSafeInteger(image.height)) continue
-      const width = Number(image.width)
-      const height = Number(image.height)
-      if (width < candidate.imageWidth || height < candidate.imageHeight) continue
-      if (width === candidate.imageWidth && height === candidate.imageHeight) continue
-      const variant = { imageUrl: image.uri, width, height }
+      const variant = largerImage(imageFromRecord(record), candidate)
+      if (!variant) continue
       if (selected && (
         selected.imageUrl !== variant.imageUrl ||
         selected.width !== variant.width ||
@@ -351,6 +355,26 @@ export function extractLargerViewerImage(
   }
 
   return selected
+}
+
+export function extractLargerFeedImage(
+  jsonScripts: readonly string[],
+  candidate: FacebookStoryCandidate,
+): ViewerImage | undefined {
+  return selectExactPhotoImage(jsonScripts, candidate, (record) =>
+    record.__typename === 'Photo' && record.id === candidate.photoId
+      ? record.viewer_image
+      : undefined)
+}
+
+export function extractLargerViewerImage(
+  jsonScripts: readonly string[],
+  candidate: FacebookStoryCandidate,
+): ViewerImage | undefined {
+  return selectExactPhotoImage(jsonScripts, candidate, (record) => {
+    const media = record.currMedia
+    return isRecord(media) && media.id === candidate.photoId ? media.image : undefined
+  })
 }
 
 export function selectFacebookCandidate(
@@ -433,9 +457,26 @@ export async function fetchFacebookMenu(target?: FacebookPostTarget): Promise<Fa
       return { image: await response.body(), mimeType }
     }
 
-    // The feed's photo_image is a display-sized derivative. The exact photo's
-    // viewer can expose a larger variant; match its numeric photo ID before
-    // using it, and retain the feed URL if Facebook withholds the viewer image.
+    // The feed can contain a larger viewer_image for the exact attachment even
+    // when the attachment's photo_image is display-sized. Try it before a
+    // separate viewer navigation, which can be restricted on hosted runners.
+    const feedLarger = extractLargerFeedImage(jsonScripts, candidate)
+    if (feedLarger) {
+      try {
+        const downloaded = await downloadImage(feedLarger.imageUrl, pageUrl)
+        process.stdout.write(
+          `Facebook image: ${feedLarger.width}x${feedLarger.height} feed photo variant ` +
+          `(preview ${candidate.imageWidth}x${candidate.imageHeight}, ${downloaded.image.byteLength} bytes)\n`,
+        )
+        return { status: 'ready', candidate, ...downloaded }
+      } catch {
+        process.stdout.write('Facebook larger feed photo CDN download failed; trying photo viewer\n')
+      }
+    }
+
+    // The exact photo's viewer may expose a larger variant when the feed does
+    // not. Match its numeric photo ID before using it, then fall back to the
+    // attachment's display image if Facebook withholds both larger variants.
     if (candidate.photoId && candidate.imageWidth && candidate.imageHeight) {
       const photoUrl = candidate.photoUrl
         ?? `https://www.facebook.com/photo/?fbid=${candidate.photoId}`
