@@ -7,6 +7,7 @@ interface FacebookStoryCandidate {
   imageUrl: string
   postUrl: string
   photoId?: string
+  photoUrl?: string
   imageWidth?: number
   imageHeight?: number
 }
@@ -159,8 +160,26 @@ function mediaFromAttachment(attachment: JsonRecord): JsonRecord | undefined {
 interface FacebookPhoto {
   imageUrl: string
   photoId?: string
+  photoUrl?: string
   imageWidth?: number
   imageHeight?: number
+}
+
+function exactPhotoPageUrl(value: unknown, photoId: string): string | undefined {
+  if (typeof value !== 'string') return undefined
+  try {
+    const url = new URL(value)
+    if (url.protocol !== 'https:' || !['facebook.com', 'www.facebook.com'].includes(url.hostname)
+      || url.port || url.username || url.password) {
+      return undefined
+    }
+    if (!['/photo/', '/photo.php'].includes(url.pathname)) return undefined
+    const photoIds = url.searchParams.getAll('fbid')
+    if (photoIds.length !== 1 || photoIds[0] !== photoId) return undefined
+    return url.toString()
+  } catch {
+    return undefined
+  }
 }
 
 function directPhoto(record: JsonRecord): FacebookPhoto | undefined {
@@ -176,6 +195,7 @@ function directPhoto(record: JsonRecord): FacebookPhoto | undefined {
     const photoId = typeof media.id === 'string' && /^\d+$/.test(media.id)
       ? media.id
       : undefined
+    const photoUrl = photoId ? exactPhotoPageUrl(media.url, photoId) : undefined
     const width = media.photo_image.width
     const height = media.photo_image.height
     const dimensionsValid = Number.isSafeInteger(width) && Number(width) > 0
@@ -183,6 +203,7 @@ function directPhoto(record: JsonRecord): FacebookPhoto | undefined {
     const photo: FacebookPhoto = {
       imageUrl: uri,
       ...(photoId ? { photoId } : {}),
+      ...(photoUrl ? { photoUrl } : {}),
       ...(dimensionsValid ? { imageWidth: Number(width), imageHeight: Number(height) } : {}),
     }
     const previous = photos.get(uri)
@@ -416,28 +437,48 @@ export async function fetchFacebookMenu(target?: FacebookPostTarget): Promise<Fa
     // viewer can expose a larger variant; match its numeric photo ID before
     // using it, and retain the feed URL if Facebook withholds the viewer image.
     if (candidate.photoId && candidate.imageWidth && candidate.imageHeight) {
-      const photoUrl = `https://www.facebook.com/photo/?fbid=${candidate.photoId}`
+      const photoUrl = candidate.photoUrl
+        ?? `https://www.facebook.com/photo/?fbid=${candidate.photoId}`
+      let viewerIssue = 'no matching larger image'
       try {
         const viewerResponse = await page.goto(photoUrl, {
           waitUntil: 'domcontentloaded',
           timeout: 45_000,
         })
         if (viewerResponse?.ok()) {
+          await page.waitForFunction(
+            `Array.from(document.querySelectorAll('script[type="application/json"]')).some((script) => script.textContent?.includes('"currMedia"'))`,
+            undefined,
+            { timeout: 10_000 },
+          ).catch(() => undefined)
           const viewerScripts = await page.locator('script[type="application/json"]').allTextContents()
           const larger = extractLargerViewerImage(viewerScripts, candidate)
           if (larger) {
-            const downloaded = await downloadImage(larger.imageUrl, photoUrl)
-            process.stdout.write(
-              `Facebook image: ${larger.width}x${larger.height} photo viewer variant ` +
-              `(feed ${candidate.imageWidth}x${candidate.imageHeight}, ${downloaded.image.byteLength} bytes)\n`,
-            )
-            return { status: 'ready', candidate, ...downloaded }
+            try {
+              const downloaded = await downloadImage(larger.imageUrl, photoUrl)
+              process.stdout.write(
+                `Facebook image: ${larger.width}x${larger.height} photo viewer variant ` +
+                `(feed ${candidate.imageWidth}x${candidate.imageHeight}, ${downloaded.image.byteLength} bytes)\n`,
+              )
+              return { status: 'ready', candidate, ...downloaded }
+            } catch {
+              viewerIssue = 'larger CDN download failed'
+            }
+          } else {
+            viewerIssue = `no matching larger image in ${viewerScripts.length} JSON scripts`
           }
+        } else {
+          viewerIssue = `viewer HTTP ${viewerResponse?.status() ?? 'no response'}`
         }
       } catch {
-        // A viewer layout or CDN failure must not prevent the established
-        // feed-image path from importing a public menu.
+        // A viewer navigation or layout failure must not prevent the
+        // established feed-image path from importing a public menu.
+        viewerIssue = 'viewer navigation failed'
       }
+      const photoLinkKind = candidate.photoUrl ? 'attachment link' : 'constructed link'
+      process.stdout.write(`Facebook photo viewer fallback (${photoLinkKind}): ${viewerIssue}\n`)
+    } else {
+      process.stdout.write('Facebook photo viewer fallback: feed record lacks photo ID or dimensions\n')
     }
 
     const downloaded = await downloadImage(candidate.imageUrl, pageUrl)

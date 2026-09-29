@@ -137,6 +137,7 @@ describe('Facebook embedded post parsing', () => {
             media: {
               id: '777',
               __typename: 'Photo',
+              url: 'https://www.facebook.com/photo/?fbid=777&set=a.123',
               photo_image: { uri: imageUrl, width: 1080, height: 1532 },
             },
           },
@@ -147,10 +148,16 @@ describe('Facebook embedded post parsing', () => {
     expect(candidatesFromScripts([feed(record)])[0]).toMatchObject({
       postId: '444',
       photoId: '777',
+      photoUrl: 'https://www.facebook.com/photo/?fbid=777&set=a.123',
       imageUrl,
       imageWidth: 1080,
       imageHeight: 1532,
     })
+
+    const mismatchedUrl = structuredClone(record)
+    mismatchedUrl.attachments[0]!.styles.attachment.media.url =
+      'https://www.facebook.com/photo/?fbid=999&set=a.123'
+    expect(candidatesFromScripts([feed(mismatchedUrl)])[0]).not.toHaveProperty('photoUrl')
   })
 
   it('selects a larger viewer image only from the exact attached photo', () => {
