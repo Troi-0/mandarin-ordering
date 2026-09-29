@@ -6,6 +6,9 @@ interface FacebookStoryCandidate {
   creationTime: number
   imageUrl: string
   postUrl: string
+  photoId?: string
+  imageWidth?: number
+  imageHeight?: number
 }
 
 export interface FacebookPostTarget {
@@ -153,9 +156,16 @@ function mediaFromAttachment(attachment: JsonRecord): JsonRecord | undefined {
   return isRecord(attachment.media) ? attachment.media : undefined
 }
 
-function directPhotoUrl(record: JsonRecord): string | undefined {
+interface FacebookPhoto {
+  imageUrl: string
+  photoId?: string
+  imageWidth?: number
+  imageHeight?: number
+}
+
+function directPhoto(record: JsonRecord): FacebookPhoto | undefined {
   if (!Array.isArray(record.attachments)) return undefined
-  const photos = new Set<string>()
+  const photos = new Map<string, FacebookPhoto>()
 
   for (const attachment of record.attachments) {
     if (!isRecord(attachment)) continue
@@ -163,27 +173,45 @@ function directPhotoUrl(record: JsonRecord): string | undefined {
     if (!media || !isRecord(media.photo_image) || typeof media.photo_image.uri !== 'string') continue
     const uri = media.photo_image.uri
     if (!isFacebookCdnUrl(uri)) continue
-    photos.add(uri)
+    const photoId = typeof media.id === 'string' && /^\d+$/.test(media.id)
+      ? media.id
+      : undefined
+    const width = media.photo_image.width
+    const height = media.photo_image.height
+    const dimensionsValid = Number.isSafeInteger(width) && Number(width) > 0
+      && Number.isSafeInteger(height) && Number(height) > 0
+    const photo: FacebookPhoto = {
+      imageUrl: uri,
+      ...(photoId ? { photoId } : {}),
+      ...(dimensionsValid ? { imageWidth: Number(width), imageHeight: Number(height) } : {}),
+    }
+    const previous = photos.get(uri)
+    if (previous && (
+      previous.photoId !== photo.photoId ||
+      previous.imageWidth !== photo.imageWidth ||
+      previous.imageHeight !== photo.imageHeight
+    )) return undefined
+    photos.set(uri, photo)
   }
 
   // Daily menus are single-image posts. Choosing among different photos would
   // reintroduce guesswork, so an ambiguous post is intentionally unavailable.
   if (photos.size !== 1) return undefined
-  return photos.values().next().value as string
+  return photos.values().next().value as FacebookPhoto
 }
 
 function candidateFromRecord(record: JsonRecord): FacebookStoryCandidate | undefined {
   if (typeof record.post_id !== 'string' || !/^\d+$/.test(record.post_id)) return undefined
   if (!Number.isSafeInteger(record.creation_time) || Number(record.creation_time) <= 0) return undefined
   if (!directAuthorIds(record).includes(PAGE_ID)) return undefined
-  const imageUrl = directPhotoUrl(record)
-  if (!imageUrl) return undefined
+  const photo = directPhoto(record)
+  if (!photo) return undefined
 
   const postId = record.post_id
   return {
     postId,
     creationTime: Number(record.creation_time),
-    imageUrl,
+    ...photo,
     postUrl: `https://www.facebook.com/permalink.php?story_fbid=${postId}&id=${PAGE_ID}`,
   }
 }
@@ -229,7 +257,7 @@ export function inspectFacebookFeed(jsonScripts: readonly string[]): FacebookFee
       if (isPageStory(record)) {
         const postId = record.post_id as string
         pageStoryIds.add(postId)
-        if (!directPhotoUrl(record) && carriesUnusableMedia(record)) unusableMediaIds.add(postId)
+        if (!directPhoto(record) && carriesUnusableMedia(record)) unusableMediaIds.add(postId)
       }
 
       const candidate = candidateFromRecord(record)
@@ -241,7 +269,10 @@ export function inspectFacebookFeed(jsonScripts: readonly string[]): FacebookFee
       }
       if (
         previous.creationTime !== candidate.creationTime ||
-        previous.imageUrl !== candidate.imageUrl
+        previous.imageUrl !== candidate.imageUrl ||
+        previous.photoId !== candidate.photoId ||
+        previous.imageWidth !== candidate.imageWidth ||
+        previous.imageHeight !== candidate.imageHeight
       ) {
         candidates.delete(candidate.postId)
         ambiguousPostIds.add(candidate.postId)
@@ -256,6 +287,49 @@ export function inspectFacebookFeed(jsonScripts: readonly string[]): FacebookFee
     pageStories: pageStoryIds.size,
     unusableMediaStories: unusableMediaIds.size,
   }
+}
+
+interface ViewerImage {
+  imageUrl: string
+  width: number
+  height: number
+}
+
+export function extractLargerViewerImage(
+  jsonScripts: readonly string[],
+  candidate: FacebookStoryCandidate,
+): ViewerImage | undefined {
+  if (!candidate.photoId || !candidate.imageWidth || !candidate.imageHeight) return undefined
+  let selected: ViewerImage | undefined
+
+  for (const source of jsonScripts) {
+    let parsed: unknown
+    try {
+      parsed = JSON.parse(source) as unknown
+    } catch {
+      continue
+    }
+    for (const record of recordsIn(parsed)) {
+      const media = record.currMedia
+      if (!isRecord(media) || media.id !== candidate.photoId || !isRecord(media.image)) continue
+      const image = media.image
+      if (typeof image.uri !== 'string' || !isFacebookCdnUrl(image.uri)) continue
+      if (!Number.isSafeInteger(image.width) || !Number.isSafeInteger(image.height)) continue
+      const width = Number(image.width)
+      const height = Number(image.height)
+      if (width < candidate.imageWidth || height < candidate.imageHeight) continue
+      if (width === candidate.imageWidth && height === candidate.imageHeight) continue
+      const variant = { imageUrl: image.uri, width, height }
+      if (selected && (
+        selected.imageUrl !== variant.imageUrl ||
+        selected.width !== variant.width ||
+        selected.height !== variant.height
+      )) return undefined
+      selected = variant
+    }
+  }
+
+  return selected
 }
 
 export function selectFacebookCandidate(
@@ -325,16 +399,55 @@ export async function fetchFacebookMenu(target?: FacebookPostTarget): Promise<Fa
       }
     }
 
-    const response = await context.request.get(candidate.imageUrl, {
-      headers: { referer: pageUrl },
-      timeout: 30_000,
-    })
-    if (!response.ok()) throw new Error(`Facebook image download failed with ${response.status()}`)
-    const contentType = response.headers()['content-type']?.split(';')[0] ?? 'image/jpeg'
-    if (!['image/jpeg', 'image/png', 'image/webp'].includes(contentType)) {
-      throw new Error(`Unsupported Facebook image type: ${contentType}`)
+    async function downloadImage(imageUrl: string, referer: string) {
+      const response = await context.request.get(imageUrl, {
+        headers: { referer },
+        timeout: 30_000,
+      })
+      if (!response.ok()) throw new Error(`Facebook image download failed with ${response.status()}`)
+      const mimeType = response.headers()['content-type']?.split(';')[0] ?? 'image/jpeg'
+      if (!['image/jpeg', 'image/png', 'image/webp'].includes(mimeType)) {
+        throw new Error(`Unsupported Facebook image type: ${mimeType}`)
+      }
+      return { image: await response.body(), mimeType }
     }
-    return { status: 'ready', candidate, image: await response.body(), mimeType: contentType }
+
+    // The feed's photo_image is a display-sized derivative. The exact photo's
+    // viewer can expose a larger variant; match its numeric photo ID before
+    // using it, and retain the feed URL if Facebook withholds the viewer image.
+    if (candidate.photoId && candidate.imageWidth && candidate.imageHeight) {
+      const photoUrl = `https://www.facebook.com/photo/?fbid=${candidate.photoId}`
+      try {
+        const viewerResponse = await page.goto(photoUrl, {
+          waitUntil: 'domcontentloaded',
+          timeout: 45_000,
+        })
+        if (viewerResponse?.ok()) {
+          const viewerScripts = await page.locator('script[type="application/json"]').allTextContents()
+          const larger = extractLargerViewerImage(viewerScripts, candidate)
+          if (larger) {
+            const downloaded = await downloadImage(larger.imageUrl, photoUrl)
+            process.stdout.write(
+              `Facebook image: ${larger.width}x${larger.height} photo viewer variant ` +
+              `(feed ${candidate.imageWidth}x${candidate.imageHeight}, ${downloaded.image.byteLength} bytes)\n`,
+            )
+            return { status: 'ready', candidate, ...downloaded }
+          }
+        }
+      } catch {
+        // A viewer layout or CDN failure must not prevent the established
+        // feed-image path from importing a public menu.
+      }
+    }
+
+    const downloaded = await downloadImage(candidate.imageUrl, pageUrl)
+    const feedDimensions = candidate.imageWidth && candidate.imageHeight
+      ? `${candidate.imageWidth}x${candidate.imageHeight}`
+      : 'unknown dimensions'
+    process.stdout.write(
+      `Facebook image: ${feedDimensions} feed variant (${downloaded.image.byteLength} bytes)\n`,
+    )
+    return { status: 'ready', candidate, ...downloaded }
   } finally {
     await browser.close()
   }

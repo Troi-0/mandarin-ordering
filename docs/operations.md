@@ -38,6 +38,11 @@ GitHub watchdog has been removed. The Facebook importer remains callable through
 parses Facebook's embedded JSON and accepts an image only when the same
 structured post record directly owns the post ID, creation
 time, Mandarin House Page author, and one unambiguous Facebook CDN attachment.
+For that exact attachment, it checks the photo viewer for a larger image tied to
+the same numeric photo ID. When available, the larger viewer image goes to both
+Gemini passes; otherwise the feed image remains the fallback. The importer logs
+the chosen variant's reported dimensions and downloaded byte count. Facebook
+may still resize its viewer image relative to the file originally uploaded.
 It sorts those records by embedded creation time, rejects anything not dated
 today in Sofia, then runs two independent image transcriptions. The second pass
 is blind: it never receives the first pass. Code matches categories by normalized
@@ -47,7 +52,7 @@ spelling and whitespace differences are non-blocking; the extraction name is
 displayed and both raw transcripts remain available in dry-run reports.
 
 When those full-image passes do not approve, the importer makes one final
-focused close inspection of the original pixels, with explicit attention to
+focused close inspection of the downloaded pixels, with explicit attention to
 leading price digits and text crossing decorative artwork. It publishes only if
 that focused transcript contains no uncertainty and exactly matches one of the
 two earlier transcripts on categories, item counts, portions, and every price.

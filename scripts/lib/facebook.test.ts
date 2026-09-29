@@ -2,6 +2,7 @@ import type { Page } from 'playwright'
 import { describe, expect, it, vi } from 'vitest'
 import { PAGE_ID } from '../../src/lib/menu-schema.ts'
 import {
+  extractLargerViewerImage,
   extractTargetedPermalinkImage,
   inspectFacebookFeed,
   selectFacebookCandidate,
@@ -124,6 +125,66 @@ describe('Facebook embedded post parsing', () => {
       imageUrl: 'https://scontent.example.fbcdn.net/444.jpg',
       postUrl: `https://www.facebook.com/permalink.php?story_fbid=444&id=${PAGE_ID}`,
     })
+  })
+
+  it('retains the attached photo identity and feed dimensions for the viewer lookup', () => {
+    const imageUrl = 'https://scontent.example.fbcdn.net/feed.jpg'
+    const record = {
+      ...story('444', 400),
+      attachments: [{
+        styles: {
+          attachment: {
+            media: {
+              id: '777',
+              __typename: 'Photo',
+              photo_image: { uri: imageUrl, width: 1080, height: 1532 },
+            },
+          },
+        },
+      }],
+    }
+
+    expect(candidatesFromScripts([feed(record)])[0]).toMatchObject({
+      postId: '444',
+      photoId: '777',
+      imageUrl,
+      imageWidth: 1080,
+      imageHeight: 1532,
+    })
+  })
+
+  it('selects a larger viewer image only from the exact attached photo', () => {
+    const candidate = {
+      postId: '444',
+      creationTime: 400,
+      postUrl: `https://www.facebook.com/permalink.php?story_fbid=444&id=${PAGE_ID}`,
+      imageUrl: 'https://scontent.example.fbcdn.net/feed.jpg',
+      photoId: '777',
+      imageWidth: 1080,
+      imageHeight: 1532,
+    }
+    const viewer = (id: string, uri: string, width: number, height: number) => ({
+      __bbox: { result: { data: { currMedia: { id, image: { uri, width, height } } } } },
+    })
+    const full = 'https://scontent.example.fbcdn.net/full.jpg'
+
+    expect(extractLargerViewerImage([
+      JSON.stringify(viewer('999', 'https://scontent.example.fbcdn.net/wrong.jpg', 4000, 5000)),
+      JSON.stringify(viewer('777', full, 1444, 2048)),
+    ], candidate)).toEqual({ imageUrl: full, width: 1444, height: 2048 })
+    expect(extractLargerViewerImage([
+      JSON.stringify(viewer('777', full, 1080, 1532)),
+    ], candidate)).toBeUndefined()
+    expect(extractLargerViewerImage([
+      JSON.stringify(viewer('777', full, 800, 2048)),
+    ], candidate)).toBeUndefined()
+    expect(extractLargerViewerImage([
+      JSON.stringify(viewer('777', 'https://example.com/full.jpg', 1444, 2048)),
+    ], candidate)).toBeUndefined()
+    expect(extractLargerViewerImage([
+      JSON.stringify(viewer('777', full, 1444, 2048)),
+      JSON.stringify(viewer('777', 'https://scontent.example.fbcdn.net/other.jpg', 1444, 2048)),
+    ], candidate)).toBeUndefined()
   })
 
   it('supports direct legacy Page author fields', () => {
