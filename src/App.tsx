@@ -1,5 +1,6 @@
 import { useEffect, useMemo, useRef, useState } from 'react'
 import currentPublicationData from '../data/current-menu.json'
+import { loadDevelopmentMenu } from './lib/development-menu.ts'
 import {
   formatBulgarianDate,
   isMenuOverdue,
@@ -735,6 +736,15 @@ function MenuContent({ menu }: { menu: Menu }) {
 
 export function App() {
   const result = menuPublicationSchema.safeParse(currentPublicationData)
+  if (import.meta.env.DEV) {
+    const menu = loadDevelopmentMenu(result.success && result.data.status === 'ready' ? result.data.menu : null)
+    if (menu) return <>
+      <aside className="development-note" role="status" aria-label="Локална разработка">
+        Локална разработка · Запазено меню от <strong>{formatBulgarianDate(menu.date)}</strong>
+      </aside>
+      <MenuApp menu={menu} />
+    </>
+  }
   if (!result.success || result.data.status !== 'ready' || !isTodayInSofia(result.data.menu.date)) {
     return <UnavailableMenu />
   }

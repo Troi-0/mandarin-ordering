@@ -27,6 +27,7 @@ button:focus-visible, a:focus-visible, input:focus-visible, textarea:focus-visib
 }
 
 .hero { position: relative; overflow: hidden; color: white; background: var(--orange); }
+.development-note { padding: .7rem 1rem; color: var(--ink); background: #edf5dc; border-bottom: 1px solid var(--line); text-align: center; font-size: .85rem; line-height: 1.5; }
 .hero::before, .hero::after { content: ""; position: absolute; border-radius: 999px; pointer-events: none; }
 .hero::before { width: 25rem; height: 25rem; right: -6rem; top: -10rem; border: 5rem solid rgb(255 255 255 / 8%); }
 .hero::after { width: 12rem; height: 12rem; left: 44%; bottom: -7rem; background: var(--lime); opacity: .9; }

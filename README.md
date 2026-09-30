@@ -39,6 +39,14 @@ npm install
 npm run dev
 ```
 
+The development server displays the latest saved menu, even on weekends or when
+the current publication is unavailable. A notice shows the original menu date.
+It chooses the newest valid menu from `data/current-menu.json` and `data/menus/`,
+preferring the current publication for corrections on the same date. Basket,
+search, favorites, and copying work normally. Menu dates and saved data are not
+rewritten. Production builds (including `npm run preview`) keep the normal
+today-only menu check and do not include the development archive loader.
+
 Use `npm run check` for the full zero-cost, data, lint, unit-test, and production
 build validation. It also runs the Cloudflare scheduler's own checks, so install
 that package once with `npm ci --prefix workers/menu-scheduler`.

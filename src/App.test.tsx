@@ -27,6 +27,8 @@ function mobileViewport() {
 }
 
 beforeEach(() => {
+  // The default App tests protect production behavior; dev cases opt in below.
+  vi.stubEnv('DEV', false)
   mobileViewport()
   vi.stubGlobal('navigator', Object.create(navigator, { share: { configurable: true, value: undefined } }))
 })
@@ -34,6 +36,7 @@ afterEach(() => {
   vi.useRealTimers()
   vi.restoreAllMocks()
   vi.unstubAllGlobals()
+  vi.unstubAllEnvs()
 })
 
 describe('dish favorites', () => {
@@ -325,6 +328,37 @@ describe('remembered-name tab coordination', () => {
 })
 
 describe('interactive menu', () => {
+  it.each(['2026-10-01T06:00:00Z', '2026-09-12T12:00:00Z'])('loads a saved menu in development on %s, including weekends', (now) => {
+    vi.stubEnv('DEV', true)
+    vi.useFakeTimers()
+    vi.setSystemTime(new Date(now))
+    render(<App />)
+    expect(screen.getByRole('status', { name: 'Локална разработка' })).toHaveTextContent('Локална разработка · Запазено меню от')
+    expect(screen.getByRole('heading', { name: 'Днешното меню' })).toBeInTheDocument()
+    expect(screen.getAllByRole('button', { name: /^Добави / }).length).toBeGreaterThan(0)
+    expect(screen.queryByRole('heading', { name: 'Днес ресторантът почива' })).not.toBeInTheDocument()
+    expect(screen.queryByRole('heading', { name: 'Днешното меню все още не е налично' })).not.toBeInTheDocument()
+  })
+
+  it('keeps the real basket, search, and favorites usable with the development menu', async () => {
+    vi.stubEnv('DEV', true)
+    const user = userEvent.setup()
+    const writeText = installClipboard()
+    render(<App />)
+    const add = screen.getAllByRole('button', { name: /^Добави / })[0]
+    const dish = add.getAttribute('aria-label')!.replace(/^Добави /, '')
+    await user.click(add)
+    await user.click(screen.getByRole('button', { name: `Любимо ястие: ${dish}` }))
+    expect(screen.getByRole('button', { name: `Любимо ястие: ${dish}` })).toHaveAttribute('aria-pressed', 'true')
+    await user.type(screen.getByRole('searchbox'), 'няма такова ястие')
+    expect(screen.getByText('Няма намерени ястия')).toBeInTheDocument()
+    const basket = within(screen.getByRole('complementary', { name: 'Обобщение на избора' }))
+    expect(basket.getByText(dish)).toBeInTheDocument()
+    await user.type(basket.getByLabelText(/Твоето име/), 'Тест')
+    await user.click(basket.getByRole('button', { name: 'Копирай избора' }))
+    expect(writeText).toHaveBeenCalledWith(expect.stringContaining(`1 × ${dish}`))
+  })
+
   it('fails closed on a working day when the embedded publication date is not today in Sofia', () => {
     if (currentPublicationData.status !== 'ready') throw new Error('Expected a ready test publication')
     const [year, month, day] = nextWorkingSofiaDate(currentPublicationData.menu.date).split('-').map(Number)
