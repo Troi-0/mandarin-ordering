@@ -1,21 +1,21 @@
 {
   "status": "ready",
   "menu": {
-    "date": "2026-09-29",
+    "date": "2026-09-30",
     "restaurant": "Mandarin House",
     "currency": "EUR",
     "source": {
       "pageId": "100063668642218",
-      "postId": "1734902828641989",
-      "postUrl": "https://www.facebook.com/permalink.php?story_fbid=1734902828641989&id=100063668642218",
-      "publishedAt": "2026-09-29T05:30:04.000Z",
-      "imageSha256": "1ba4d736d20bf0d85dc4f7de4fa3abb4e565eef23ff27051f06cead57e479d20"
+      "postId": "1736056751859930",
+      "postUrl": "https://www.facebook.com/permalink.php?story_fbid=1736056751859930&id=100063668642218",
+      "publishedAt": "2026-09-30T05:30:08.000Z",
+      "imageSha256": "ddd8b360fc58186546604a4c1ffad1bfa52fc0b1da08e660a782255b823de703"
     },
-    "importedAt": "2026-09-29T05:39:09.822Z",
+    "importedAt": "2026-09-30T07:48:52.818Z",
     "importMethod": "facebook",
     "validation": {
-      "extractedBy": "gemini-3.7-flash",
-      "verifiedBy": "gemini-3.7-flash:blind-transcription",
+      "extractedBy": "gemini-3.6-flash",
+      "verifiedBy": "gemini-3.6-flash:focused-consensus",
       "uncertain": false
     },
     "categories": [
@@ -24,16 +24,16 @@
         "name": "СУПИ",
         "items": [
           {
-            "id": "item-0b14aa8b903b",
-            "name": "Гулаш със свинско",
+            "id": "item-7b22a221ab65",
+            "name": "Пуешка супа по селски",
             "portion": "350 мл",
             "priceCents": 270
           },
           {
-            "id": "item-7233ad3cde05",
-            "name": "Леща чорба",
+            "id": "item-27382c42c153",
+            "name": "Гъбена крем супа",
             "portion": "350 мл",
-            "priceCents": 270
+            "priceCents": 250
           },
           {
             "id": "item-27bd3994ec83",
@@ -48,64 +48,64 @@
         "name": "ОСНОВНИ",
         "items": [
           {
-            "id": "item-02bf8fe7531c",
-            "name": "Пълнено пилешко филе с филаделфия и сушени боровинки, с гарнитура",
-            "portion": "350 г",
-            "priceCents": 530
-          },
-          {
-            "id": "item-f21b5875f08a",
-            "name": "Гриловано пилешко филе с бекон, кисели краставички гъби и картофки, в тортила, с гарнитура",
-            "portion": "350 г",
-            "priceCents": 530
-          },
-          {
-            "id": "item-ba8b3f9f542a",
-            "name": "Боб с наденица на фурна",
+            "id": "item-8539637aeb69",
+            "name": "Панирано пилешко филе с пармезан, с гарнитура",
             "portion": "350 г",
             "priceCents": 510
           },
           {
-            "id": "item-9bdd42513b44",
-            "name": "Мераклийско гювече със свинско, три вида наденички, картофки, моцарела и яйце,",
+            "id": "item-02783a709bc7",
+            "name": "Кюфтета от пуешко филе с моцарела и чушки, с ½ пърленка, тирокафтери и гарнитура",
+            "portion": "350 г",
+            "priceCents": 610
+          },
+          {
+            "id": "item-44826c08f4fc",
+            "name": "Мариновани карета от свинско контра филе на плоча, с гарнитура",
+            "portion": "350 г",
+            "priceCents": 510
+          },
+          {
+            "id": "item-b3cf8c1e565e",
+            "name": "Запечено свинско джоланче, с прясно зеле на фурна",
             "portion": "350 г",
             "priceCents": 490
           },
           {
-            "id": "item-b04ec182fe62",
-            "name": "Папуцаки с мляно месо, с гарнитура /пълнен патладжан с мляно месо и зеленчуци, запечен с моцарела/",
+            "id": "item-c962244a64b8",
+            "name": "Кюфтенца по цариградски с картофено пюре и сос демиглас",
+            "portion": "350 г",
+            "priceCents": 450
+          },
+          {
+            "id": "item-ba81ce3ed784",
+            "name": "Мусака по гръцки с патладжан",
+            "portion": "350 г",
+            "priceCents": 480
+          },
+          {
+            "id": "item-5ced41e34a0d",
+            "name": "Пълнен батат с мус от сирена, с гарнитура",
             "portion": "350 г",
             "priceCents": 510
           },
           {
-            "id": "item-4ec857f076b8",
-            "name": "Класическа Мусака",
+            "id": "item-5d0a9fef09e9",
+            "name": "Руло от тиквички с филаделфия и пушена сьомга, с гарнитура",
             "portion": "350 г",
-            "priceCents": 470
+            "priceCents": 530
           },
           {
-            "id": "item-6e7002588108",
-            "name": "Картофени кюфтета , с млечен сос и гарнитура",
+            "id": "item-ec90fd9edd56",
+            "name": "Постен градинарски гювеч",
             "portion": "350 г",
-            "priceCents": 440
+            "priceCents": 400
           },
           {
-            "id": "item-4d839f169530",
-            "name": "Шакшука /яйца по арабски /",
-            "portion": "350 г",
-            "priceCents": 430
-          },
-          {
-            "id": "item-3cea65f9ba1e",
-            "name": "Оризо паста с горски гъби",
-            "portion": "350 г",
-            "priceCents": 420
-          },
-          {
-            "id": "item-1703531da27b",
-            "name": "Пъстърва на скара /цяла/, с гарнитура",
-            "portion": "350 г",
-            "priceCents": 790
+            "id": "item-e6df00266ba3",
+            "name": "Ципура на скара /цяла/, с гарнитура",
+            "portion": "400 г",
+            "priceCents": 860
           }
         ]
       },
@@ -198,13 +198,13 @@
         "name": "ДЕСЕРТ",
         "items": [
           {
-            "id": "item-d1a9d0789429",
-            "name": "Чийз кейк с малини",
-            "priceCents": 310
+            "id": "item-92a3f5728b13",
+            "name": "Домашна бисквитена торта",
+            "priceCents": 290
           },
           {
-            "id": "item-82ab54c93d81",
-            "name": "Крем маскарпоне с бишкоти и ягоди",
+            "id": "item-0f55c05fdc14",
+            "name": "Панакота с шоколад",
             "priceCents": 290
           },
           {
