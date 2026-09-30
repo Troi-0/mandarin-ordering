@@ -18,6 +18,13 @@ Object.defineProperty(globalThis, 'localStorage', {
   value: new MemoryStorage(),
 })
 
+// jsdom has no dialog top layer. Browser checks cover native inertness and Escape;
+// this shim lets component tests exercise our focus and lifecycle handlers.
+Object.defineProperties(HTMLDialogElement.prototype, {
+  showModal: { configurable: true, value(this: HTMLDialogElement) { this.setAttribute('open', '') } },
+  close: { configurable: true, value(this: HTMLDialogElement) { this.removeAttribute('open') } },
+})
+
 afterEach(() => {
   cleanup()
   localStorage.clear()

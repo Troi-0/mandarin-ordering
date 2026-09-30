@@ -1,6 +1,6 @@
-import { render, screen, waitFor, within } from '@testing-library/react'
+import { act, fireEvent, render, screen, waitFor, within } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
-import { afterEach, describe, expect, it, vi } from 'vitest'
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import currentPublicationData from '../data/current-menu.json'
 import { nextWorkingSofiaDate } from './lib/date.ts'
 import { menuFixture } from './test/menu-fixture.ts'
@@ -14,7 +14,18 @@ function installClipboard(writeText = vi.fn().mockResolvedValue(undefined)) {
   return writeText
 }
 
-afterEach(() => vi.useRealTimers())
+function mobileViewport() {
+  const media = { matches: false, addEventListener: vi.fn(), removeEventListener: vi.fn() }
+  vi.stubGlobal('matchMedia', vi.fn().mockReturnValue(media))
+  return media
+}
+
+beforeEach(() => mobileViewport())
+afterEach(() => {
+  vi.useRealTimers()
+  vi.restoreAllMocks()
+  vi.unstubAllGlobals()
+})
 
 describe('interactive menu', () => {
   it('fails closed on a working day when the embedded publication date is not today in Sofia', () => {
@@ -128,7 +139,10 @@ describe('interactive menu', () => {
     render(<MenuApp menu={menuFixture} />)
     await user.click(screen.getByRole('button', { name: 'Добави Пилешка супа' }))
     await user.click(screen.getByRole('button', { name: 'Добави Пилешко филе' }))
-    const basket = within(screen.getAllByRole('complementary', { name: 'Обобщение на избора' })[view])
+    if (view === 1) await user.click(screen.getByRole('button', { name: /2 избора/ }))
+    const basket = within(view === 0
+      ? screen.getByRole('complementary', { name: 'Обобщение на избора' })
+      : screen.getByRole('dialog', { name: 'Обядът ти' }))
 
     await user.click(basket.getByRole('button', { name: 'Добави Пилешка супа в избора' }))
     expect(screen.getByLabelText('Избрано количество: 2')).toHaveTextContent('2')
@@ -150,6 +164,7 @@ describe('interactive menu', () => {
     await user.click(basket.getByRole('button', { name: 'Намали Пилешка супа в избора' }))
     expect(basket.getByText('Добави нещо вкусно от менюто.')).toBeInTheDocument()
     expect(basket.getByText(/0,00\s*€/)).toBeInTheDocument()
+    if (view === 1) expect(basket.getByRole('heading', { name: 'Обядът ти' })).toHaveFocus()
   })
 
   it('enforces the quantity limit when editing from the basket', async () => {
@@ -290,7 +305,16 @@ describe('interactive menu', () => {
     await user.click(screen.getAllByRole('button', { name: /Копирай избора/ })[0])
 
     expect(writeText).toHaveBeenCalledWith(expect.stringContaining('Бележка: Без хляб'))
-    expect(screen.getAllByText('Не успяхме да копираме. Опитай отново.').length).toBeGreaterThan(0)
+    expect(screen.getByText('Автоматичното копиране не успя. Копирай обобщението ръчно.')).toBeInTheDocument()
+    const manual = screen.getByRole('textbox', { name: 'Обобщение за ръчно копиране' }) as HTMLTextAreaElement
+    expect(manual).toHaveValue(writeText.mock.calls[0][0])
+    expect(manual).toHaveFocus()
+    expect(manual.selectionStart).toBe(0)
+    expect(manual.selectionEnd).toBe(manual.value.length)
+    await user.click(screen.getByRole('button', { name: 'Избери целия текст' }))
+    expect(manual).toHaveFocus()
+    await user.click(screen.getByRole('button', { name: 'Добави Пилешка супа' }))
+    expect(screen.queryByRole('textbox', { name: 'Обобщение за ръчно копиране' })).not.toBeInTheDocument()
   })
 
   it('uses the local copy fallback when the Clipboard API is unavailable', async () => {
@@ -334,5 +358,159 @@ describe('interactive menu', () => {
       participantName: '',
       note: '',
     })
+  })
+
+  it('opens the mobile dialog at its title, wraps Tab in both directions, validates the visible field, and restores focus on cancel', async () => {
+    const user = userEvent.setup()
+    const showModal = vi.spyOn(HTMLDialogElement.prototype, 'showModal')
+    render(<MenuApp menu={menuFixture} />)
+    expect(screen.queryByRole('dialog')).not.toBeInTheDocument()
+    expect(document.getElementById('mobile-participant-name')).toBeNull()
+    expect(screen.getAllByLabelText(/Твоето име/)).toHaveLength(1)
+    await user.click(screen.getByRole('button', { name: 'Добави Пилешка супа' }))
+    const opener = screen.getByRole('button', { name: /1 избор/ })
+    await user.click(opener)
+    const dialog = screen.getByRole('dialog', { name: 'Обядът ти' })
+    const basket = within(dialog)
+    expect(showModal).toHaveBeenCalledOnce()
+    expect(dialog).toHaveAttribute('aria-modal', 'true')
+    expect(document.body.style.overflow).toBe('hidden')
+    expect(basket.getByRole('heading', { name: 'Обядът ти' })).toHaveFocus()
+    await user.tab()
+    expect(basket.getByRole('button', { name: 'Изчисти' })).toHaveFocus()
+    await user.tab({ shift: true })
+    expect(basket.getByRole('button', { name: 'Затвори избора' })).toHaveFocus()
+    expect(fireEvent.keyDown(basket.getByRole('button', { name: 'Затвори избора' }), { key: 'Tab', shiftKey: true })).toBe(false)
+    expect(basket.getByRole('button', { name: /Копирай избора/ })).toHaveFocus()
+    expect(fireEvent.keyDown(basket.getByRole('button', { name: /Копирай избора/ }), { key: 'Tab' })).toBe(false)
+    expect(basket.getByRole('button', { name: 'Затвори избора' })).toHaveFocus()
+    await user.click(basket.getByRole('button', { name: /Копирай избора/ }))
+    expect(basket.getByLabelText(/Твоето име/)).toHaveFocus()
+    fireEvent(dialog, new Event('cancel', { cancelable: true }))
+    expect(screen.queryByRole('dialog')).not.toBeInTheDocument()
+    expect(opener).toHaveFocus()
+    expect(opener).toHaveAttribute('aria-expanded', 'false')
+    expect(document.body.style.overflow).toBe('')
+    expect(document.getElementById('mobile-participant-name')).toBeNull()
+  })
+
+  it.each(['button', 'backdrop'])('closes the mobile dialog via its %s and returns focus', async (method) => {
+    const user = userEvent.setup()
+    render(<MenuApp menu={menuFixture} />)
+    const opener = screen.getByRole('button', { name: /0 избора/ })
+    await user.click(opener)
+    const dialog = screen.getByRole('dialog', { name: 'Обядът ти' })
+    if (method === 'button') await user.click(within(dialog).getByRole('button', { name: 'Затвори избора' }))
+    else {
+      fireEvent.click(dialog, { clientX: 0, clientY: 0 })
+      expect(dialog).toHaveAttribute('open')
+      fireEvent.click(dialog, { clientX: -1, clientY: -1 })
+    }
+    expect(screen.queryByRole('dialog')).not.toBeInTheDocument()
+    expect(opener).toHaveFocus()
+  })
+
+  it('closes the modal when switching to desktop and focuses the visible basket', async () => {
+    const media = mobileViewport()
+    const user = userEvent.setup()
+    render(<MenuApp menu={menuFixture} />)
+    await user.click(screen.getByRole('button', { name: /0 избора/ }))
+    act(() => { media.matches = true; media.addEventListener.mock.calls[0][1]() })
+    expect(screen.queryByRole('dialog')).not.toBeInTheDocument()
+    expect(within(screen.getByRole('complementary', { name: 'Обобщение на избора' })).getByRole('heading', { name: 'Обядът ти' })).toHaveFocus()
+    expect(media.removeEventListener).toHaveBeenCalledWith('change', expect.any(Function))
+  })
+
+  it.each(['false', 'throw', 'missing'])('offers a manual summary when the legacy copy result is %s', async (result) => {
+    const user = userEvent.setup()
+    Object.defineProperty(navigator, 'clipboard', { configurable: true, value: undefined })
+    Object.defineProperty(document, 'execCommand', { configurable: true, value: result === 'missing' ? undefined : vi.fn(() => {
+      if (result === 'throw') throw new Error('denied')
+      return false
+    }) })
+    render(<MenuApp menu={menuFixture} />)
+    await user.click(screen.getByRole('button', { name: 'Добави Пилешка супа' }))
+    await user.type(screen.getByLabelText(/Твоето име/), 'Иван')
+    await user.click(screen.getByRole('button', { name: /Копирай избора/ }))
+    expect(screen.queryByText('Обобщението е копирано.')).not.toBeInTheDocument()
+    expect((screen.getByRole('textbox', { name: 'Обобщение за ръчно копиране' }) as HTMLTextAreaElement).value).toContain('1 × Пилешка супа')
+    expect(document.querySelector('textarea[style*="opacity"]')).toBeNull()
+  })
+
+  it('keeps the legacy copy fallback inside the modal and offers recovery there if it fails', async () => {
+    const user = userEvent.setup()
+    Object.defineProperty(navigator, 'clipboard', { configurable: true, value: undefined })
+    const execCommand = vi.fn(() => {
+      expect(document.activeElement?.closest('dialog')).toHaveAttribute('open')
+      return false
+    })
+    Object.defineProperty(document, 'execCommand', { configurable: true, value: execCommand })
+    render(<MenuApp menu={menuFixture} />)
+    await user.click(screen.getByRole('button', { name: 'Добави Пилешка супа' }))
+    await user.click(screen.getByRole('button', { name: /1 избор/ }))
+    const basket = within(screen.getByRole('dialog', { name: 'Обядът ти' }))
+    await user.type(basket.getByLabelText(/Твоето име/), 'Иван')
+    await user.click(basket.getByRole('button', { name: /Копирай избора/ }))
+    expect(execCommand).toHaveBeenCalledWith('copy')
+    expect(basket.getByRole('textbox', { name: 'Обобщение за ръчно копиране' })).toHaveFocus()
+  })
+
+  it('does not show an obsolete summary when a pending copy fails after editing the basket', async () => {
+    const user = userEvent.setup()
+    let rejectCopy!: (error: Error) => void
+    installClipboard(vi.fn(() => new Promise((_resolve, reject) => { rejectCopy = reject })))
+    render(<MenuApp menu={menuFixture} />)
+    await user.click(screen.getByRole('button', { name: 'Добави Пилешка супа' }))
+    await user.type(screen.getByLabelText(/Твоето име/), 'Иван')
+    await user.click(screen.getByRole('button', { name: /Копирай избора/ }))
+    await user.click(screen.getByRole('button', { name: 'Добави Пилешка супа' }))
+    await act(async () => rejectCopy(new Error('denied')))
+    expect(screen.queryByRole('textbox', { name: 'Обобщение за ръчно копиране' })).not.toBeInTheDocument()
+    expect(screen.queryByText(/Автоматичното копиране не успя/)).not.toBeInTheDocument()
+  })
+
+  it.each(['blocked', 'full'])('keeps selection, copying, clearing, and Undo usable when storage is %s', async (failure) => {
+    const user = userEvent.setup()
+    const writeText = installClipboard()
+    if (failure === 'blocked') {
+      vi.spyOn(localStorage, 'getItem').mockImplementation(() => { throw new DOMException('blocked', 'SecurityError') })
+      vi.spyOn(localStorage, 'removeItem').mockImplementation(() => { throw new DOMException('blocked', 'SecurityError') })
+    }
+    vi.spyOn(localStorage, 'setItem').mockImplementation(() => { throw new DOMException('unavailable', 'QuotaExceededError') })
+    render(<MenuApp menu={menuFixture} />)
+    expect(screen.getByText(/Браузърът не позволява запазване/)).toBeInTheDocument()
+    await user.click(screen.getByRole('button', { name: 'Добави Пилешка супа' }))
+    await user.type(screen.getByLabelText(/Твоето име/), 'Иван')
+    await user.click(screen.getByRole('button', { name: /Копирай избора/ }))
+    expect(writeText).toHaveBeenCalledWith(expect.stringContaining('1 × Пилешка супа'))
+    await user.click(screen.getByRole('button', { name: 'Изчисти' }))
+    await user.click(screen.getByRole('button', { name: 'Върни избора' }))
+    expect(screen.getByLabelText('Избрано количество: 1')).toHaveTextContent('1')
+    expect(screen.getByLabelText(/Твоето име/)).toHaveValue('Иван')
+  })
+
+  it('reconciles a corrected same-day menu, retains valid choices, reprices, and copies only current dishes', async () => {
+    const user = userEvent.setup()
+    const writeText = installClipboard()
+    const view = render(<MenuApp menu={menuFixture} />)
+    await user.click(screen.getByRole('button', { name: 'Добави Пилешка супа' }))
+    await user.click(screen.getByRole('button', { name: 'Добави Пилешка супа' }))
+    await user.click(screen.getByRole('button', { name: 'Добави Пилешко филе' }))
+    await user.type(screen.getByLabelText(/Твоето име/), 'Иван')
+    await user.type(screen.getByLabelText(/Бележка/), 'Без хляб')
+    const corrected = structuredClone(menuFixture)
+    corrected.categories[0].items[0].priceCents = 300
+    corrected.categories[1].items[0].id = 'new-main'
+    view.rerender(<MenuApp menu={corrected} />)
+    expect(screen.getByText(/Менюто или запазеният избор е променен/)).toBeInTheDocument()
+    const basket = within(screen.getByRole('complementary', { name: 'Обобщение на избора' }))
+    expect(basket.queryByText('Пилешко филе')).not.toBeInTheDocument()
+    expect(screen.getByLabelText('Избрано количество: 2')).toHaveTextContent('2')
+    expect(basket.getAllByText(/6,00\s*€/)).toHaveLength(2)
+    await user.click(basket.getByRole('button', { name: /Копирай избора/ }))
+    expect(writeText).toHaveBeenCalledWith(expect.stringContaining('2 × Пилешка супа'))
+    expect(writeText.mock.calls[0][0]).not.toContain('Пилешко филе')
+    expect(writeText.mock.calls[0][0]).toContain('Бележка: Без хляб')
+    expect(JSON.parse(localStorage.getItem('mandarin-order-draft-v1')!).quantities).toEqual({ soup: 2 })
   })
 })

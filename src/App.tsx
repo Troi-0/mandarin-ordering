@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from 'react'
+import { useEffect, useMemo, useRef, useState } from 'react'
 import currentPublicationData from '../data/current-menu.json'
 import {
   formatBulgarianDate,
@@ -173,13 +173,23 @@ function UnavailableMenu() {
 }
 
 export function MenuApp({ menu }: { menu: Menu }) {
-  const initialDraft = useMemo(() => loadDraft(menu.date), [menu.date])
-  const [quantities, setQuantities] = useState<Quantities>(initialDraft?.quantities ?? {})
-  const [participantName, setParticipantName] = useState(initialDraft?.participantName ?? '')
-  const [note, setNote] = useState(initialDraft?.note ?? '')
+  // Reconcile the saved draft again if a corrected publication replaces this menu.
+  return <MenuContent key={JSON.stringify([menu.date, menu.categories])} menu={menu} />
+}
+
+function MenuContent({ menu }: { menu: Menu }) {
+  const [initialDraft] = useState(() => loadDraft(menu))
+  const [quantities, setQuantities] = useState<Quantities>(initialDraft.draft?.quantities ?? {})
+  const [participantName, setParticipantName] = useState(initialDraft.draft?.participantName ?? '')
+  const [note, setNote] = useState(initialDraft.draft?.note ?? '')
+  const [storageAvailable, setStorageAvailable] = useState(initialDraft.available)
+  const [draftAdjusted, setDraftAdjusted] = useState(initialDraft.adjusted)
   const [basketOpen, setBasketOpen] = useState(false)
   const [notice, setNotice] = useState<Notice>(null)
   const [nameError, setNameError] = useState(false)
+  const [manualCopy, setManualCopy] = useState<{ text: string; view: 'desktop' | 'mobile' } | null>(null)
+  const copyAttempt = useRef(0)
+  const mobileDialog = useRef<HTMLDialogElement>(null)
   const [search, setSearch] = useState('')
   const [maxPrice, setMaxPrice] = useState('')
   const [selectedOnly, setSelectedOnly] = useState(false)
@@ -209,11 +219,55 @@ export function MenuApp({ menu }: { menu: Menu }) {
   const hasFilters = search !== '' || maxPrice !== '' || selectedOnly
 
   useEffect(() => {
-    saveDraft({ date: menu.date, quantities, participantName, note })
-  }, [menu.date, note, participantName, quantities])
+    setStorageAvailable(saveDraft({ date: menu.date, quantities, participantName, note }, menu))
+  }, [menu, note, participantName, quantities])
+
+  useEffect(() => {
+    if (!basketOpen) return
+    const dialog = mobileDialog.current!
+    const opener = document.activeElement instanceof HTMLElement ? document.activeElement : null
+    const desktop = window.matchMedia('(min-width: 901px)')
+    const previousOverflow = document.body.style.overflow
+    document.body.style.overflow = 'hidden'
+    dialog.showModal()
+    document.getElementById('mobile-basket-title')?.focus()
+    function closeOnDesktop() {
+      if (desktop.matches) setBasketOpen(false)
+    }
+    desktop.addEventListener('change', closeOnDesktop)
+    closeOnDesktop()
+    return () => {
+      desktop.removeEventListener('change', closeOnDesktop)
+      dialog.close()
+      document.body.style.overflow = previousOverflow
+      if (desktop.matches) document.getElementById('desktop-basket-title')?.focus()
+      else opener?.focus()
+    }
+  }, [basketOpen])
+
+  useEffect(() => {
+    // Removing a focused line or Clear/Undo button must not strand keyboard focus.
+    if (basketOpen && !mobileDialog.current?.contains(document.activeElement)) {
+      document.getElementById('mobile-basket-title')?.focus()
+    }
+  }, [basketOpen, quantities])
+
+  useEffect(() => {
+    if (!manualCopy) return
+    const field = document.getElementById(`${manualCopy.view}-copy-summary`) as HTMLTextAreaElement | null
+    field?.focus()
+    field?.select()
+  }, [manualCopy])
+
+  function clearCopyFeedback() {
+    copyAttempt.current += 1
+    setNotice(null)
+    setManualCopy(null)
+  }
 
   function setQuantity(itemId: string, quantity: number) {
-    setNotice(null)
+    clearCopyFeedback()
+    setDraftAdjusted(false)
     setClearedDraft(null)
     setQuantities((current) => {
       if (quantity === 0) {
@@ -230,9 +284,10 @@ export function MenuApp({ menu }: { menu: Menu }) {
     setQuantities({})
     setParticipantName('')
     setNote('')
-    setNotice(null)
+    clearCopyFeedback()
+    setDraftAdjusted(false)
     setNameError(false)
-    clearDraft()
+    setStorageAvailable(clearDraft())
   }
 
   function restoreOrder() {
@@ -241,7 +296,8 @@ export function MenuApp({ menu }: { menu: Menu }) {
     setParticipantName(clearedDraft.participantName)
     setNote(clearedDraft.note)
     setNameError(false)
-    setNotice(null)
+    clearCopyFeedback()
+    setDraftAdjusted(false)
     setClearedDraft(null)
   }
 
@@ -251,7 +307,7 @@ export function MenuApp({ menu }: { menu: Menu }) {
     setSelectedOnly(false)
   }
 
-  async function copyText(text: string) {
+  async function copyText(text: string, container: HTMLElement) {
     if (navigator.clipboard?.writeText) {
       await navigator.clipboard.writeText(text)
       return
@@ -260,18 +316,28 @@ export function MenuApp({ menu }: { menu: Menu }) {
     textarea.value = text
     textarea.style.position = 'fixed'
     textarea.style.opacity = '0'
-    document.body.append(textarea)
-    textarea.select()
-    document.execCommand('copy')
-    textarea.remove()
+    const previousFocus = document.activeElement instanceof HTMLElement ? document.activeElement : null
+    // A modal makes elements outside it inert, so keep the fallback inside the active basket.
+    container.append(textarea)
+    try {
+      textarea.focus()
+      textarea.select()
+      if (!document.execCommand?.('copy')) throw new Error('Copy was not completed')
+    } finally {
+      textarea.remove()
+      previousFocus?.focus()
+    }
   }
 
-  async function copyOrder(nameInputId: string) {
+  async function copyOrder(view: 'desktop' | 'mobile') {
+    const attempt = ++copyAttempt.current
+    setManualCopy(null)
+    const nameInput = document.getElementById(`${view}-participant-name`)!
     const cleanName = participantName.trim()
     if (!cleanName) {
       setNameError(true)
       setNotice({ kind: 'error', text: 'Добави име, за да се знае чий е изборът.' })
-      document.getElementById(nameInputId)?.focus()
+      nameInput.focus()
       return
     }
     if (orderLines.length === 0) {
@@ -283,10 +349,13 @@ export function MenuApp({ menu }: { menu: Menu }) {
     const summary = createOrderSummary(menu, quantities, cleanName, note)
     const text = summaryToText(summary)
     try {
-      await copyText(text)
+      await copyText(text, nameInput.closest('.basket-content') as HTMLElement)
+      if (attempt !== copyAttempt.current) return
       setNotice({ kind: 'success', text: 'Обобщението е копирано.' })
     } catch {
-      setNotice({ kind: 'error', text: 'Не успяхме да копираме. Опитай отново.' })
+      if (attempt !== copyAttempt.current) return
+      setManualCopy({ text, view })
+      setNotice({ kind: 'error', text: 'Автоматичното копиране не успя. Копирай обобщението ръчно.' })
     }
   }
 
@@ -299,7 +368,7 @@ export function MenuApp({ menu }: { menu: Menu }) {
         <div className="basket-heading">
           <div>
             <span className="eyebrow">Твоят избор</span>
-            <h2>Обядът ти</h2>
+            <h2 id={`${view}-basket-title`} tabIndex={-1}>Обядът ти</h2>
           </div>
           {itemCount > 0 && (
             <button className="text-button" type="button" onClick={resetOrder}>Изчисти</button>
@@ -312,6 +381,9 @@ export function MenuApp({ menu }: { menu: Menu }) {
             <button className="text-button" type="button" onClick={restoreOrder}>Върни избора</button>
           </div>
         )}
+
+        {draftAdjusted && <p className="notice notice--warning" role="status">Менюто или запазеният избор е променен. Провери ястията и сумата.</p>}
+        {!storageAvailable && <p className="notice notice--warning" role="status">Браузърът не позволява запазване на избора. Копирай го, преди да затвориш страницата.</p>}
 
         {orderLines.length === 0 ? (
           <div className="basket-empty">
@@ -354,6 +426,7 @@ export function MenuApp({ menu }: { menu: Menu }) {
             autoComplete="name"
             placeholder="Напр. Иван"
             onChange={(event) => {
+              clearCopyFeedback()
               setClearedDraft(null)
               setParticipantName(event.target.value)
               if (event.target.value.trim()) setNameError(false)
@@ -368,6 +441,7 @@ export function MenuApp({ menu }: { menu: Menu }) {
             maxLength={240}
             placeholder="Напр. без люто"
             onChange={(event) => {
+              clearCopyFeedback()
               setClearedDraft(null)
               setNote(event.target.value)
             }}
@@ -375,7 +449,18 @@ export function MenuApp({ menu }: { menu: Menu }) {
         </div>
 
         {notice && <p className={`notice notice--${notice.kind}`} role="status">{notice.text}</p>}
-        <button className="share-button" type="button" onClick={() => copyOrder(nameInputId)}>
+        {manualCopy && (
+          <div className="manual-copy">
+            <label htmlFor={`${view}-copy-summary`}>Обобщение за ръчно копиране</label>
+            <textarea id={`${view}-copy-summary`} value={manualCopy.text} readOnly rows={6} onFocus={(event) => event.currentTarget.select()} />
+            <button className="text-button" type="button" onClick={() => {
+              const field = document.getElementById(`${view}-copy-summary`) as HTMLTextAreaElement
+              field.focus()
+              field.select()
+            }}>Избери целия текст</button>
+          </div>
+        )}
+        <button className="share-button" type="button" onClick={() => copyOrder(view)}>
           <span>Копирай избора</span><span aria-hidden="true">⧉</span>
         </button>
         <p className="privacy-note">Нищо не се изпраща автоматично и не се съхранява онлайн.</p>
@@ -504,21 +589,44 @@ export function MenuApp({ menu }: { menu: Menu }) {
         type="button"
         aria-expanded={basketOpen}
         aria-controls="mobile-basket"
-        onClick={() => setBasketOpen((open) => !open)}
+        aria-haspopup="dialog"
+        onClick={() => setBasketOpen(true)}
       >
         <span><b>{itemCount}</b> {itemCount === 1 ? 'избор' : 'избора'}</span>
         <strong>{formatEuro(totalCents)}</strong>
         <span aria-hidden="true">{basketOpen ? '↓' : '↑'}</span>
       </button>
-      <aside
+      <dialog
+        ref={mobileDialog}
         id="mobile-basket"
-        className={`mobile-basket ${basketOpen ? 'mobile-basket--open' : ''}`}
-        aria-label="Обобщение на избора"
+        className="mobile-basket"
+        aria-labelledby="mobile-basket-title"
+        aria-modal="true"
+        onCancel={(event) => { event.preventDefault(); setBasketOpen(false) }}
+        onClick={(event) => {
+          if (event.target !== event.currentTarget) return
+          const bounds = event.currentTarget.getBoundingClientRect()
+          if (event.clientX < bounds.left || event.clientX > bounds.right || event.clientY < bounds.top || event.clientY > bounds.bottom) setBasketOpen(false)
+        }}
+        onKeyDown={(event) => {
+          if (event.key !== 'Tab') return
+          const controls = event.currentTarget.querySelectorAll<HTMLElement>('button:not([disabled]), input:not([disabled]), textarea:not([disabled]), select:not([disabled]), a[href], [tabindex="0"]')
+          const first = controls[0]
+          const last = controls[controls.length - 1]
+          if (event.shiftKey && (document.activeElement === first || document.activeElement?.id === 'mobile-basket-title')) {
+            event.preventDefault()
+            last?.focus()
+          } else if (!event.shiftKey && document.activeElement === last) {
+            event.preventDefault()
+            first?.focus()
+          }
+        }}
       >
-        <button className="mobile-basket-close" type="button" onClick={() => setBasketOpen(false)} aria-label="Затвори избора">×</button>
-        {renderBasket('mobile')}
-      </aside>
-      {basketOpen && <button className="basket-backdrop" type="button" aria-label="Затвори избора" onClick={() => setBasketOpen(false)} />}
+        {basketOpen && <>
+          <button className="mobile-basket-close" type="button" onClick={() => setBasketOpen(false)} aria-label="Затвори избора">×</button>
+          {renderBasket('mobile')}
+        </>}
+      </dialog>
 
       <footer>
         <span>Mandarin lunch picker</span>
