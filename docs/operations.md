@@ -12,7 +12,11 @@ database, analytics, payment SDK, hosted font, or order-submission endpoint.
    billing account attached. Add it as the repository Actions secret
    `GEMINI_API_KEY`. Never add a paid fallback or attach billing to that project.
 3. Run **Deploy GitHub Pages** once from the Actions tab. After that, successful
-   menu commits deploy automatically.
+   menu commits deploy automatically after the full `npm run check` passes.
+   Pages installs both the root and scheduler dependencies, checks the same
+   revision that produces `dist`, and uploads that artifact only on success.
+   A failed check skips deployment for push, manual, and repository-dispatch
+   runs alike. The separate Validate workflow remains useful for pull requests.
 
 Production starts with `gemini-3.8-flash` at low thinking and high per-image
 resolution. Each model can retry a transient request up to 20 times. A 429 that

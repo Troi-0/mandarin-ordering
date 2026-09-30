@@ -91,10 +91,29 @@ describe('GitHub workflow contracts', () => {
     expect(deploy).toContain('- data/current-menu.json')
     expect(deploy).toContain('repository_dispatch:')
     expect(deploy).toContain('types: [menu-published]')
-    expect(deploy).toContain('run: npm run build')
+    expect(deploy).toContain('run: npm run check')
     expect(deploy).toContain('uses: actions/configure-pages@v6')
     expect(deploy).toContain('uses: actions/upload-pages-artifact@v5')
     expect(deploy).toContain('uses: actions/deploy-pages@v5')
     expect(deploy).not.toContain('GEMINI_API_KEY')
+  })
+
+  it('gates Pages artifact upload and deployment on complete checks of the checked-out revision for every trigger', async () => {
+    const deploy = await workflow('deploy-pages.yml')
+    const build = deploy.split(/^  build:\n/m)[1]?.split(/^  deploy:\n/m)[0]
+    const publish = deploy.split(/^  deploy:\n/m)[1]
+    expect(build).toBeDefined()
+    expect(publish).toBeDefined()
+    expect(deploy).toContain('workflow_dispatch:')
+    expect(build).toContain('run: npm ci --prefix workers/menu-scheduler')
+    expect(build).toContain('workers/menu-scheduler/package-lock.json')
+    expect(build).toContain('run: npm run check')
+    expect(build!.indexOf('run: npm run check')).toBeLessThan(build!.indexOf('uses: actions/upload-pages-artifact'))
+    expect(build!.match(/uses: actions\/checkout/g)).toHaveLength(1)
+    expect(publish).toMatch(/^    needs: build$/m)
+    expect(publish).not.toContain('actions/checkout')
+    // Default step/job success gating must apply, regardless of the triggering event.
+    expect(build).not.toMatch(/^\s+(?:if|continue-on-error):/m)
+    expect(publish).not.toMatch(/^\s+(?:if|continue-on-error):/m)
   })
 })

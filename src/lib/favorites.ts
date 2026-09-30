@@ -11,6 +11,17 @@ export function favoriteNameKey(name: string): string {
   return name.normalize('NFC').toLocaleLowerCase('bg-BG').trim().replace(/\s+/g, ' ')
 }
 
+// Failed writes retain intent for each changed dish, including removals. Other
+// tabs may still change all the remaining saved favorites independently.
+export function reconcileFavorites(saved: ReadonlySet<string>, pending: ReadonlyMap<string, boolean>): Set<string> {
+  const favorites = new Set(saved)
+  for (const [key, selected] of pending) {
+    if (selected) favorites.add(key)
+    else favorites.delete(key)
+  }
+  return favorites
+}
+
 export function loadFavorites(storage?: Storage): FavoritesPreference {
   const favorites = new Set<string>()
   try {

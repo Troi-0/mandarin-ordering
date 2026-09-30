@@ -35,8 +35,14 @@ jobs:
         with:
           node-version: 24
           cache: npm
+          cache-dependency-path: |
+            package-lock.json
+            workers/menu-scheduler/package-lock.json
       - run: npm ci
-      - run: npm run build
+      - run: npm ci --prefix workers/menu-scheduler
+      # This also builds dist. Every trigger must pass checks for this checkout
+      # before an artifact can be uploaded or its dependent deploy job can run.
+      - run: npm run check
       - uses: actions/configure-pages@v6
       - uses: actions/upload-pages-artifact@v5
         with:

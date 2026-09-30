@@ -15,10 +15,16 @@ plain-text summary themselves. The site never submits an order to the restaurant
   spacing, and Unicode composition. Price, portion, category, and position may
   change; different named variants remain separate. Missing dishes stay saved,
   and favorites sync between open tabs. Storage failures show a menu warning
-  while keeping the hearts usable for the current page.
+  while keeping the hearts usable for the current page. Unsaved additions and
+  removals are merged with other tabs' changes and retried on the next heart
+  action. An external clear removes saved favorites but retains these unsaved
+  choices; the warning remains until a save succeeds.
 - The basket draft lasts for its menu date. “Запомни името ми” is optional and
   keeps only the name for future menu days in the same browser. Turning it off
-  removes that preference; clearing the basket keeps an opted-in name.
+  removes the saved name and retains an opt-out marker. Open tabs synchronize
+  this choice without changing their current basket name. Editing a name cannot
+  opt in again; only checking the box can. Existing saved names remain supported.
+  Clearing the basket keeps an opted-in name.
 - “Сподели избора” appears when the browser provides native sharing. It uses
   the same validated summary as Copy. Cancelling leaves the basket intact;
   sharing errors direct the visitor to Copy. A successful handoff to the share
@@ -36,6 +42,10 @@ npm run dev
 Use `npm run check` for the full zero-cost, data, lint, unit-test, and production
 build validation. It also runs the Cloudflare scheduler's own checks, so install
 that package once with `npm ci --prefix workers/menu-scheduler`.
+
+Every Pages publishing path (push, manual run, and menu repository dispatch)
+runs this complete check on the checked-out revision before uploading `dist`.
+A failed check prevents artifact upload and skips the dependent deployment.
 
 ## Daily import
 

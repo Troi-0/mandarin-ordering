@@ -1,6 +1,6 @@
 import { afterEach, describe, expect, it, vi } from 'vitest'
 import { menuFixture } from '../test/menu-fixture.ts'
-import { clearDraft, loadDraft, loadNamePreference, saveDraft, saveNamePreference } from './storage.ts'
+import { NAME_KEY, NAME_CONSENT_KEY, clearDraft, loadDraft, loadNamePreference, saveDraft, saveNamePreference, updateRememberedName } from './storage.ts'
 
 afterEach(() => vi.restoreAllMocks())
 
@@ -134,6 +134,52 @@ describe('local basket lifetime', () => {
 })
 
 describe('remembered participant name', () => {
+  it('updates only an existing opt-in and retains opt-out even if a stale client writes the legacy name', () => {
+    expect(updateRememberedName('Иван')).toMatchObject({ remember: false, available: true })
+    expect(localStorage.getItem(NAME_KEY)).toBeNull()
+    expect(saveNamePreference('Иван', true)).toBe(true)
+    expect(updateRememberedName('  Мария  ')).toMatchObject({ remember: true, available: true })
+    expect(localStorage.getItem(NAME_KEY)).toBe('"Мария"')
+    expect(saveNamePreference('', false)).toBe(true)
+    localStorage.setItem(NAME_KEY, '"От стар раздел"')
+    expect(loadNamePreference()).toMatchObject({ remember: false, available: true })
+    expect(localStorage.getItem(NAME_KEY)).toBeNull()
+    expect(localStorage.getItem(NAME_CONSENT_KEY)).toBe('false')
+    expect(saveNamePreference('Ново съгласие', true)).toBe(true)
+    expect(loadNamePreference()).toMatchObject({ participantName: 'Ново съгласие', remember: true })
+  })
+
+  it.each(['opt-out', 'clear'])('keeps a concurrent %s authoritative when it occurs between an automatic name read and write', (operation) => {
+    saveNamePreference('Иван', true)
+    const setItem = localStorage.setItem.bind(localStorage)
+    const removeItem = localStorage.removeItem.bind(localStorage)
+    vi.spyOn(localStorage, 'setItem').mockImplementation((key, value) => {
+      if (key === NAME_KEY) {
+        if (operation === 'clear') localStorage.clear()
+        else {
+          setItem(NAME_CONSENT_KEY, 'false') // Other tab opts out after the initial read.
+          removeItem(NAME_KEY)
+        }
+      }
+      setItem(key, value)
+    })
+    expect(updateRememberedName('Мария')).toMatchObject({ remember: false, available: true })
+    expect(localStorage.getItem(NAME_KEY)).toBeNull()
+    expect(loadNamePreference().remember).toBe(false)
+  })
+
+  it('fails closed when consent cannot be read and reports a failed automatic name update', () => {
+    saveNamePreference('Иван', true)
+    const reads = vi.spyOn(localStorage, 'getItem').mockImplementation(() => { throw new DOMException('blocked', 'SecurityError') })
+    const writes = vi.spyOn(localStorage, 'setItem')
+    expect(updateRememberedName('Мария')).toMatchObject({ available: false })
+    expect(writes).not.toHaveBeenCalled()
+    reads.mockRestore()
+    writes.mockImplementation(() => { throw new DOMException('full', 'QuotaExceededError') })
+    expect(updateRememberedName('Мария')).toEqual({ remember: true, available: false })
+    expect(localStorage.getItem(NAME_KEY)).toBe('"Иван"')
+  })
+
   it('is opt-in, survives daily draft expiry, and removes only the preference when disabled', () => {
     expect(loadNamePreference()).toEqual({ participantName: '', remember: false, available: true })
     saveDraft({ date: menuFixture.date, quantities: { soup: 1 }, participantName: 'Иван', note: '' }, menuFixture)

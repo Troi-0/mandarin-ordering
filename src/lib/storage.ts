@@ -9,13 +9,21 @@ interface BasketDraft {
 }
 
 const STORAGE_KEY = 'mandarin-order-draft-v1'
-const NAME_KEY = 'mandarin-participant-name-v1'
+export const NAME_KEY = 'mandarin-participant-name-v1'
+export const NAME_CONSENT_KEY = 'mandarin-remember-name-v1'
 
 export function loadNamePreference(storage?: Storage): { participantName: string; remember: boolean; available: boolean } {
   const empty = { participantName: '', remember: false, available: true }
   try {
     const store = storage ?? localStorage
     const raw = store.getItem(NAME_KEY)
+    const consent = store.getItem(NAME_CONSENT_KEY)
+    // A durable opt-out also protects against a stale tab writing the old name
+    // format. Legacy saved names remain supported until an explicit opt-out.
+    if (consent !== null && consent !== 'true') {
+      if (raw !== null) store.removeItem(NAME_KEY)
+      return empty
+    }
     if (raw === null) return empty
     let parsed: unknown
     try { parsed = JSON.parse(raw) } catch { parsed = null }
@@ -32,11 +40,34 @@ export function loadNamePreference(storage?: Storage): { participantName: string
 export function saveNamePreference(participantName: string, remember: boolean, storage?: Storage): boolean {
   try {
     const store = storage ?? localStorage
+    // Editing a name must never write this consent marker. Only a checkbox
+    // action can opt in; opt-out is retained even after the name is removed.
+    store.setItem(NAME_CONSENT_KEY, JSON.stringify(remember))
     if (remember) store.setItem(NAME_KEY, JSON.stringify(participantName.trim()))
     else store.removeItem(NAME_KEY)
     return true
   } catch {
     return false
+  }
+}
+
+export function updateRememberedName(participantName: string, storage?: Storage): { remember: boolean; available: boolean } {
+  const latest = loadNamePreference(storage)
+  if (!latest.available || !latest.remember) return latest
+  try {
+    const store = storage ?? localStorage
+    const consentBefore = store.getItem(NAME_CONSENT_KEY)
+    store.setItem(NAME_KEY, JSON.stringify(participantName.trim()))
+    if (consentBefore !== null && store.getItem(NAME_CONSENT_KEY) === null) {
+      // clear() can remove the consent marker between our read and write.
+      store.removeItem(NAME_KEY)
+      return { remember: false, available: true }
+    }
+    // Recheck consent after the write too. A concurrent opt-out wins even if
+    // it happened between our read and write; stale name data is cleaned up.
+    return loadNamePreference(store)
+  } catch {
+    return { remember: true, available: false }
   }
 }
 

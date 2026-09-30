@@ -22,8 +22,8 @@ import {
   summaryToText,
   type Quantities,
 } from './lib/order.ts'
-import { clearDraft, loadDraft, loadNamePreference, saveDraft, saveNamePreference } from './lib/storage.ts'
-import { FAVORITES_KEY, favoriteNameKey, loadFavorites, saveFavorites } from './lib/favorites.ts'
+import { NAME_KEY, NAME_CONSENT_KEY, clearDraft, loadDraft, loadNamePreference, saveDraft, saveNamePreference, updateRememberedName } from './lib/storage.ts'
+import { FAVORITES_KEY, favoriteNameKey, loadFavorites, reconcileFavorites, saveFavorites } from './lib/favorites.ts'
 
 type Notice = { kind: 'success' | 'error'; text: string } | null
 
@@ -186,6 +186,7 @@ function MenuContent({ menu }: { menu: Menu }) {
   const [rememberName, setRememberName] = useState(initialName.remember)
   const [nameStorageAvailable, setNameStorageAvailable] = useState(initialName.available)
   const [favoritePreference, setFavoritePreference] = useState(() => loadFavorites())
+  const pendingFavorites = useRef(new Map<string, boolean>())
   const [note, setNote] = useState(initialDraft.draft?.note ?? '')
   const [storageAvailable, setStorageAvailable] = useState(initialDraft.available)
   const [draftAdjusted, setDraftAdjusted] = useState(initialDraft.adjusted)
@@ -220,12 +221,43 @@ function MenuContent({ menu }: { menu: Menu }) {
   }, [menu, note, participantName, quantities])
 
   useEffect(() => {
-    setNameStorageAvailable(saveNamePreference(participantName, rememberName))
-  }, [participantName, rememberName])
+    function syncNamePreference(event: StorageEvent) {
+      if (event.key !== NAME_KEY && event.key !== NAME_CONSENT_KEY && event.key !== null) return
+      const latest = loadNamePreference()
+      // Keep the current basket's name. Only device-level consent is shared.
+      setRememberName(latest.available && latest.remember)
+      setNameStorageAvailable(latest.available)
+    }
+    window.addEventListener('storage', syncNamePreference)
+    return () => window.removeEventListener('storage', syncNamePreference)
+  }, [])
+
+  function changeParticipantName(name: string) {
+    setParticipantName(name)
+    if (!rememberName) return
+    // Storage events are queued. Re-read consent before writing so an edit in
+    // an old tab cannot recreate a preference removed by another tab.
+    const latest = updateRememberedName(name)
+    setNameStorageAvailable(latest.available)
+    if (!latest.available) return
+    setRememberName(latest.remember)
+  }
+
+  function changeRememberName(remember: boolean) {
+    // Only a fresh checkbox action may create the preference.
+    setRememberName(remember)
+    setNameStorageAvailable(saveNamePreference(participantName, remember))
+  }
 
   useEffect(() => {
     function syncFavorites(event: StorageEvent) {
-      if (event.key === FAVORITES_KEY || event.key === null) setFavoritePreference(loadFavorites())
+      if (event.key !== FAVORITES_KEY && event.key !== null) return
+      const latest = loadFavorites()
+      const pending = new Map(pendingFavorites.current)
+      setFavoritePreference((current) => ({
+        favorites: reconcileFavorites(latest.available ? latest.favorites : current.favorites, pending),
+        available: latest.available && pending.size === 0,
+      }))
     }
     window.addEventListener('storage', syncFavorites)
     return () => window.removeEventListener('storage', syncFavorites)
@@ -233,14 +265,14 @@ function MenuContent({ menu }: { menu: Menu }) {
 
   function toggleFavorite(name: string) {
     const key = favoriteNameKey(name)
-    // Merge with the latest saved list when another tab has changed it. If a
-    // previous write failed, keep this page's unsaved favorites in memory.
+    // Reconcile both external changes and unsaved local additions/removals,
+    // including changes whose storage event has not reached this tab yet.
     const latest = loadFavorites()
-    const favorites = new Set(favoritePreference.available && latest.available
-      ? latest.favorites : favoritePreference.favorites)
-    if (favoritePreference.favorites.has(key)) favorites.delete(key)
-    else favorites.add(key)
-    setFavoritePreference({ favorites, available: saveFavorites(favorites) })
+    pendingFavorites.current.set(key, !favoritePreference.favorites.has(key))
+    const favorites = reconcileFavorites(latest.available ? latest.favorites : favoritePreference.favorites, pendingFavorites.current)
+    const available = saveFavorites(favorites)
+    if (available) pendingFavorites.current.clear()
+    setFavoritePreference({ favorites, available })
   }
 
   useEffect(() => {
@@ -314,7 +346,7 @@ function MenuContent({ menu }: { menu: Menu }) {
   function restoreOrder() {
     if (!clearedDraft) return
     setQuantities(clearedDraft.quantities)
-    setParticipantName(clearedDraft.participantName)
+    changeParticipantName(clearedDraft.participantName)
     setNote(clearedDraft.note)
     setNameError(false)
     clearCopyFeedback()
@@ -470,13 +502,13 @@ function MenuContent({ menu }: { menu: Menu }) {
             onChange={(event) => {
               clearCopyFeedback()
               setClearedDraft(null)
-              setParticipantName(event.target.value)
+              changeParticipantName(event.target.value)
               if (event.target.value.trim()) setNameError(false)
             }}
           />
           {nameError && <small id={nameErrorId} className="field-error">Името е задължително.</small>}
           <label className="remember-name">
-            <input type="checkbox" checked={rememberName} aria-describedby={`${view}-remember-note`} onChange={(event) => setRememberName(event.target.checked)} />
+            <input type="checkbox" checked={rememberName} aria-describedby={`${view}-remember-note`} onChange={(event) => changeRememberName(event.target.checked)} />
             Запомни името ми
           </label>
           <small id={`${view}-remember-note`} className="remember-name-note">За следващите дни в този браузър.</small>
