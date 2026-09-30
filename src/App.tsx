@@ -191,8 +191,6 @@ function MenuContent({ menu }: { menu: Menu }) {
   const copyAttempt = useRef(0)
   const mobileDialog = useRef<HTMLDialogElement>(null)
   const [search, setSearch] = useState('')
-  const [maxPrice, setMaxPrice] = useState('')
-  const [selectedOnly, setSelectedOnly] = useState(false)
   const [clearedDraft, setClearedDraft] = useState<{
     quantities: Quantities
     participantName: string
@@ -202,21 +200,14 @@ function MenuContent({ menu }: { menu: Menu }) {
   const orderLines = useMemo(() => createOrderLines(menu, quantities), [menu, quantities])
   const itemCount = orderLines.reduce((sum, line) => sum + line.quantity, 0)
   const totalCents = orderLines.reduce((sum, line) => sum + line.lineTotalCents, 0)
-  const totalMenuItems = menu.categories.reduce((sum, category) => sum + category.items.length, 0)
   const filteredCategories = useMemo(() => {
     const terms = search.trim().toLocaleLowerCase('bg-BG').split(/\s+/).filter(Boolean)
     return menu.categories.map((category, index) => ({
       ...category,
       position: index + 1,
-      items: category.items.filter((item) => (
-        terms.every((term) => item.name.toLocaleLowerCase('bg-BG').includes(term))
-        && (!maxPrice || item.priceCents <= Number(maxPrice))
-        && (!selectedOnly || (quantities[item.id] ?? 0) > 0)
-      )),
+      items: category.items.filter((item) => terms.every((term) => item.name.toLocaleLowerCase('bg-BG').includes(term))),
     })).filter((category) => category.items.length > 0)
-  }, [maxPrice, menu, quantities, search, selectedOnly])
-  const visibleMenuItems = filteredCategories.reduce((sum, category) => sum + category.items.length, 0)
-  const hasFilters = search !== '' || maxPrice !== '' || selectedOnly
+  }, [menu, search])
 
   useEffect(() => {
     setStorageAvailable(saveDraft({ date: menu.date, quantities, participantName, note }, menu))
@@ -299,12 +290,6 @@ function MenuContent({ menu }: { menu: Menu }) {
     clearCopyFeedback()
     setDraftAdjusted(false)
     setClearedDraft(null)
-  }
-
-  function resetFilters() {
-    setSearch('')
-    setMaxPrice('')
-    setSelectedOnly(false)
   }
 
   async function copyText(text: string, container: HTMLElement) {
@@ -511,34 +496,24 @@ function MenuContent({ menu }: { menu: Menu }) {
             <p>Цените и грамажите са преписани от днешната публикация.</p>
           </div>
 
-          <div className="menu-filters" role="search" aria-label="Търсене и филтри">
-            <div className="menu-search">
-              <label htmlFor="menu-search">Търси ястие</label>
-              <input
-                id="menu-search"
-                type="search"
-                value={search}
-                placeholder="Напр. пилешко, супа…"
-                onChange={(event) => setSearch(event.target.value)}
-              />
-            </div>
-            <div className="menu-price-filter">
-              <label htmlFor="menu-max-price">Максимална цена</label>
-              <select id="menu-max-price" value={maxPrice} onChange={(event) => setMaxPrice(event.target.value)}>
-                <option value="">Без ограничение</option>
-                {[300, 500, 700, 1000].map((price) => (
-                  <option key={price} value={price}>До {formatEuro(price)}</option>
-                ))}
-              </select>
-            </div>
-            <label className="selected-filter">
-              <input type="checkbox" checked={selectedOnly} onChange={(event) => setSelectedOnly(event.target.checked)} />
-              Само избраните
-            </label>
-            <div className="filter-summary">
-              <p role="status">Показани ястия: <strong>{visibleMenuItems}</strong> от {totalMenuItems}</p>
-              {hasFilters && <button className="text-button" type="button" onClick={resetFilters}>Изчисти филтрите</button>}
-            </div>
+          <div className="menu-search" role="search" aria-label="Търсене в менюто">
+            <label className="sr-only" htmlFor="menu-search">Търси ястие</label>
+            <svg className="search-icon" viewBox="0 0 24 24" aria-hidden="true" fill="none" stroke="currentColor" strokeWidth="1.7" strokeLinecap="round">
+              <circle cx="10.5" cy="10.5" r="6.5" /><path d="m16 16 4 4" />
+            </svg>
+            <input
+              id="menu-search"
+              type="search"
+              value={search}
+              placeholder="Търси ястие…"
+              onChange={(event) => setSearch(event.target.value)}
+            />
+            {search !== '' && (
+              <button className="search-clear" type="button" aria-label="Изчисти търсенето" onClick={() => {
+                setSearch('')
+                document.getElementById('menu-search')?.focus()
+              }}>×</button>
+            )}
           </div>
 
           {filteredCategories.length > 0 ? (
@@ -549,8 +524,8 @@ function MenuContent({ menu }: { menu: Menu }) {
             </nav>
           ) : (
             <div className="menu-empty">
-              <h3>{selectedOnly && orderLines.length === 0 ? 'Още няма избрани ястия' : 'Няма намерени ястия'}</h3>
-              <p>Промени търсенето или изчисти филтрите, за да видиш менюто.</p>
+              <h3>Няма намерени ястия</h3>
+              <p>Пробвай друго име или изчисти търсенето, за да видиш менюто.</p>
             </div>
           )}
 
