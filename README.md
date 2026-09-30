@@ -10,6 +10,12 @@ plain-text summary themselves. The site never submits an order to the restaurant
 
 ## Basket and sharing
 
+- Dish hearts save favorites in this browser independently of the daily basket.
+  Favorites are highlighted whenever the full dish name returns, ignoring case,
+  spacing, and Unicode composition. Price, portion, category, and position may
+  change; different named variants remain separate. Missing dishes stay saved,
+  and favorites sync between open tabs. Storage failures show a menu warning
+  while keeping the hearts usable for the current page.
 - The basket draft lasts for its menu date. “Запомни името ми” is optional and
   keeps only the name for future menu days in the same browser. Turning it off
   removes that preference; clearing the basket keeps an opted-in name.

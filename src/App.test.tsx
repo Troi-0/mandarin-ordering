@@ -3,6 +3,7 @@ import userEvent from '@testing-library/user-event'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import currentPublicationData from '../data/current-menu.json'
 import { nextWorkingSofiaDate } from './lib/date.ts'
+import { FAVORITES_KEY, favoriteNameKey } from './lib/favorites.ts'
 import { menuFixture } from './test/menu-fixture.ts'
 import { App, MenuApp } from './App.tsx'
 
@@ -33,6 +34,146 @@ afterEach(() => {
   vi.useRealTimers()
   vi.restoreAllMocks()
   vi.unstubAllGlobals()
+})
+
+describe('dish favorites', () => {
+  it('toggles with mouse, Space, and Enter while retaining focus and a stable accessible label', async () => {
+    const user = userEvent.setup()
+    const view = render(<MenuApp menu={menuFixture} />)
+    const heart = screen.getByRole('button', { name: 'Любимо ястие: Пилешка супа' })
+    expect(heart).toHaveAttribute('aria-pressed', 'false')
+    await user.click(heart)
+    expect(heart).toHaveAttribute('aria-pressed', 'true')
+    expect(heart).toHaveFocus()
+    expect(heart.closest('article')).toHaveClass('menu-item--favorite')
+    expect(within(heart.closest('article')!).getByText('Любимо')).toBeInTheDocument()
+    expect(screen.getByText('Добави нещо вкусно от менюто.')).toBeInTheDocument()
+    await user.keyboard(' ')
+    expect(heart).toHaveAttribute('aria-pressed', 'false')
+    expect(heart).toHaveFocus()
+    expect(heart.closest('article')).not.toHaveClass('menu-item--favorite')
+    await user.keyboard('{Enter}')
+    expect(heart).toHaveAttribute('aria-pressed', 'true')
+    view.unmount()
+    const reloaded = render(<MenuApp menu={menuFixture} />)
+    expect(screen.getByRole('button', { name: 'Любимо ястие: Пилешка супа', pressed: true })).toBeInTheDocument()
+    await user.click(screen.getByRole('button', { name: 'Любимо ястие: Пилешка супа' }))
+    reloaded.unmount()
+    expect(localStorage.getItem(FAVORITES_KEY)).toBeNull()
+    render(<MenuApp menu={menuFixture} />)
+    expect(screen.getByRole('button', { name: 'Любимо ястие: Пилешка супа', pressed: false })).toBeInTheDocument()
+  })
+
+  it('recognizes returning dishes after a missing day, new IDs, category, price, portion, and order changes', async () => {
+    const user = userEvent.setup()
+    const view = render(<MenuApp menu={menuFixture} />)
+    await user.click(screen.getByRole('button', { name: 'Любимо ястие: Пилешка супа' }))
+    const missing = structuredClone(menuFixture)
+    missing.date = '2026-08-25'
+    missing.categories[0].items[0].name = 'Таратор'
+    view.rerender(<MenuApp menu={missing} />)
+    expect(screen.queryByRole('button', { pressed: true })).not.toBeInTheDocument()
+    expect(JSON.parse(localStorage.getItem(FAVORITES_KEY)!)).toEqual(['пилешка супа'])
+
+    const later = structuredClone(menuFixture)
+    later.date = '2026-08-26'
+    later.categories.reverse()
+    later.categories[1].id = 'new-soups'
+    later.categories[1].name = 'Нова категория'
+    later.categories[1].items = [
+      { id: 'soup', name: 'Пилешка супа с гъби', portion: '350 мл', priceCents: 320 },
+      { id: 'returning-soup', name: 'ПИЛЕШКА  СУПА', portion: '500 мл', priceCents: 350 },
+    ]
+    view.rerender(<MenuApp menu={later} />)
+    expect(screen.getAllByRole('button', { pressed: true })).toHaveLength(1)
+    const returning = screen.getByRole('button', { name: /Любимо ястие: ПИЛЕШКА\s+СУПА/, pressed: true })
+    expect(within(returning.closest('article')!).getByText('500 мл')).toBeInTheDocument()
+    expect(screen.getByRole('button', { name: 'Любимо ястие: Пилешка супа с гъби' })).toHaveAttribute('aria-pressed', 'false')
+    expect(screen.getByText('Добави нещо вкусно от менюто.')).toBeInTheDocument()
+  })
+
+  it('marks all portions of a favorite dish and keeps favorites separate from search, basket, Copy, and Clear', async () => {
+    const user = userEvent.setup()
+    const writeText = installClipboard()
+    const menu = structuredClone(menuFixture)
+    menu.categories[0].items.push({ id: 'large-soup', name: 'Пилешка супа', portion: '500 мл', priceCents: 350 })
+    render(<MenuApp menu={menu} />)
+    await user.click(screen.getAllByRole('button', { name: 'Любимо ястие: Пилешка супа' })[0])
+    expect(screen.getAllByRole('button', { pressed: true })).toHaveLength(2)
+    await user.type(screen.getByRole('searchbox'), 'филе')
+    expect(screen.queryByRole('button', { pressed: true })).not.toBeInTheDocument()
+    await user.click(screen.getByRole('button', { name: 'Добави Пилешко филе' }))
+    await user.type(screen.getByLabelText(/Твоето име/), 'Мария')
+    await user.click(screen.getByRole('button', { name: 'Копирай избора' }))
+    expect(writeText).toHaveBeenCalledWith(expect.stringContaining('1 × Пилешко филе'))
+    expect(writeText.mock.calls[0][0]).not.toContain('Пилешка супа')
+    await user.click(screen.getByRole('button', { name: 'Изчисти' }))
+    await user.click(screen.getByRole('button', { name: 'Изчисти търсенето' }))
+    expect(screen.getAllByRole('button', { pressed: true })).toHaveLength(2)
+    expect(screen.getByText('Добави нещо вкусно от менюто.')).toBeInTheDocument()
+  })
+
+  it('synchronizes favorites and clearing from other tabs, ignores unrelated keys, and unsubscribes on unmount', () => {
+    localStorage.setItem(FAVORITES_KEY, '["пилешка супа"]')
+    const subscribe = vi.spyOn(window, 'addEventListener')
+    const unsubscribe = vi.spyOn(window, 'removeEventListener')
+    const view = render(<MenuApp menu={menuFixture} />)
+    const handler = subscribe.mock.calls.find(([event]) => event === 'storage')![1]
+    localStorage.setItem(FAVORITES_KEY, '["пилешко филе"]')
+    fireEvent(window, new StorageEvent('storage', { key: 'unrelated' }))
+    expect(screen.getByRole('button', { name: 'Любимо ястие: Пилешка супа', pressed: true })).toBeInTheDocument()
+    fireEvent(window, new StorageEvent('storage', { key: FAVORITES_KEY }))
+    expect(screen.getByRole('button', { name: 'Любимо ястие: Пилешко филе', pressed: true })).toBeInTheDocument()
+    expect(screen.getByRole('button', { name: 'Любимо ястие: Пилешка супа' })).toHaveAttribute('aria-pressed', 'false')
+    localStorage.removeItem(FAVORITES_KEY)
+    fireEvent(window, new StorageEvent('storage', { key: null }))
+    expect(screen.queryByRole('button', { pressed: true })).not.toBeInTheDocument()
+    view.unmount()
+    expect(unsubscribe).toHaveBeenCalledWith('storage', handler)
+  })
+
+  it('preserves another tab\'s just-saved favorites when toggling before its storage event arrives', async () => {
+    const user = userEvent.setup()
+    render(<MenuApp menu={menuFixture} />)
+    localStorage.setItem(FAVORITES_KEY, '["пилешко филе"]')
+    await user.click(screen.getByRole('button', { name: 'Любимо ястие: Пилешка супа' }))
+    expect(screen.getAllByRole('button', { pressed: true })).toHaveLength(2)
+    expect(JSON.parse(localStorage.getItem(FAVORITES_KEY)!)).toEqual(['пилешка супа', 'пилешко филе'])
+  })
+
+  it.each(['blocked', 'full'])('keeps hearts usable and reports favorites that cannot be saved when storage is %s', async (failure) => {
+    const user = userEvent.setup()
+    const setItem = localStorage.setItem.bind(localStorage)
+    if (failure === 'blocked') vi.spyOn(localStorage, 'getItem').mockImplementation(() => { throw new DOMException('blocked', 'SecurityError') })
+    vi.spyOn(localStorage, 'setItem').mockImplementation((key, value) => {
+      if (key === FAVORITES_KEY) throw new DOMException('full', 'QuotaExceededError')
+      setItem(key, value)
+    })
+    render(<MenuApp menu={menuFixture} />)
+    await user.click(screen.getByRole('button', { name: 'Любимо ястие: Пилешка супа' }))
+    await user.click(screen.getByRole('button', { name: 'Любимо ястие: Пилешко филе' }))
+    expect(screen.getAllByRole('button', { pressed: true })).toHaveLength(2)
+    expect(screen.getByText(/Любимите ястия не могат да се запазят/)).toBeInTheDocument()
+    await user.click(screen.getByRole('button', { name: 'Добави Пилешка супа' }))
+    expect(screen.getByLabelText('Избрано количество: 1')).toHaveTextContent('1')
+  })
+
+  it('reports failed favorite removal and persists the in-memory choices when saving recovers', async () => {
+    const user = userEvent.setup()
+    localStorage.setItem(FAVORITES_KEY, JSON.stringify([favoriteNameKey('Пилешка супа')]))
+    const removeItem = localStorage.removeItem.bind(localStorage)
+    vi.spyOn(localStorage, 'removeItem').mockImplementation((key) => {
+      if (key === FAVORITES_KEY) throw new Error('blocked')
+      removeItem(key)
+    })
+    render(<MenuApp menu={menuFixture} />)
+    await user.click(screen.getByRole('button', { name: 'Любимо ястие: Пилешка супа' }))
+    expect(screen.queryByRole('button', { pressed: true })).not.toBeInTheDocument()
+    expect(screen.getByText(/Любимите ястия не могат да се запазят/)).toBeInTheDocument()
+    await user.click(screen.getByRole('button', { name: 'Любимо ястие: Пилешко филе' }))
+    expect(screen.queryByText(/Любимите ястия не могат да се запазят/)).not.toBeInTheDocument()
+    expect(JSON.parse(localStorage.getItem(FAVORITES_KEY)!)).toEqual(['пилешко филе'])
+  })
 })
 
 describe('interactive menu', () => {

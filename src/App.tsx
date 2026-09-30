@@ -23,6 +23,7 @@ import {
   type Quantities,
 } from './lib/order.ts'
 import { clearDraft, loadDraft, loadNamePreference, saveDraft, saveNamePreference } from './lib/storage.ts'
+import { FAVORITES_KEY, favoriteNameKey, loadFavorites, saveFavorites } from './lib/favorites.ts'
 
 type Notice = { kind: 'success' | 'error'; text: string } | null
 
@@ -184,6 +185,7 @@ function MenuContent({ menu }: { menu: Menu }) {
   const [participantName, setParticipantName] = useState(initialDraft.draft?.participantName ?? initialName.participantName)
   const [rememberName, setRememberName] = useState(initialName.remember)
   const [nameStorageAvailable, setNameStorageAvailable] = useState(initialName.available)
+  const [favoritePreference, setFavoritePreference] = useState(() => loadFavorites())
   const [note, setNote] = useState(initialDraft.draft?.note ?? '')
   const [storageAvailable, setStorageAvailable] = useState(initialDraft.available)
   const [draftAdjusted, setDraftAdjusted] = useState(initialDraft.adjusted)
@@ -220,6 +222,26 @@ function MenuContent({ menu }: { menu: Menu }) {
   useEffect(() => {
     setNameStorageAvailable(saveNamePreference(participantName, rememberName))
   }, [participantName, rememberName])
+
+  useEffect(() => {
+    function syncFavorites(event: StorageEvent) {
+      if (event.key === FAVORITES_KEY || event.key === null) setFavoritePreference(loadFavorites())
+    }
+    window.addEventListener('storage', syncFavorites)
+    return () => window.removeEventListener('storage', syncFavorites)
+  }, [])
+
+  function toggleFavorite(name: string) {
+    const key = favoriteNameKey(name)
+    // Merge with the latest saved list when another tab has changed it. If a
+    // previous write failed, keep this page's unsaved favorites in memory.
+    const latest = loadFavorites()
+    const favorites = new Set(favoritePreference.available && latest.available
+      ? latest.favorites : favoritePreference.favorites)
+    if (favoritePreference.favorites.has(key)) favorites.delete(key)
+    else favorites.add(key)
+    setFavoritePreference({ favorites, available: saveFavorites(favorites) })
+  }
 
   useEffect(() => {
     if (!basketOpen) return
@@ -561,6 +583,10 @@ function MenuContent({ menu }: { menu: Menu }) {
             )}
           </div>
 
+          {!favoritePreference.available && (
+            <p className="notice notice--warning" role="status">Любимите ястия не могат да се запазят в този браузър. Ще останат отбелязани само докато страницата е отворена.</p>
+          )}
+
           {filteredCategories.length > 0 ? (
             <nav className="category-nav" aria-label="Категории от менюто">
               {filteredCategories.map((category) => (
@@ -584,11 +610,29 @@ function MenuContent({ menu }: { menu: Menu }) {
               <div className="menu-list">
                 {category.items.map((item) => {
                   const quantity = quantities[item.id] ?? 0
+                  const favorite = favoritePreference.favorites.has(favoriteNameKey(item.name))
                   return (
-                    <article className={`menu-item ${quantity > 0 ? 'menu-item--selected' : ''}`} key={item.id}>
+                    <article className={`menu-item ${favorite ? 'menu-item--favorite' : ''} ${quantity > 0 ? 'menu-item--selected' : ''}`} key={item.id}>
                       <div className="item-copy">
-                        <h4>{item.name}</h4>
-                        {item.portion && <p>{item.portion}</p>}
+                        <div className="item-heading">
+                          <h4>{item.name}</h4>
+                          <button
+                            className="favorite-button"
+                            type="button"
+                            aria-label={`Любимо ястие: ${item.name}`}
+                            aria-pressed={favorite}
+                            title={favorite ? 'Премахни от любимите' : 'Добави в любимите'}
+                            onClick={() => toggleFavorite(item.name)}
+                          >
+                            <svg viewBox="0 0 24 24" aria-hidden="true" focusable="false" fill="none" stroke="currentColor" strokeWidth="1.7" strokeLinecap="round" strokeLinejoin="round">
+                              <path d="M20.8 4.6a5.5 5.5 0 0 0-7.8 0L12 5.7l-1.1-1.1a5.5 5.5 0 0 0-7.8 7.8L12 21l8.8-8.6a5.5 5.5 0 0 0 0-7.8Z" />
+                            </svg>
+                          </button>
+                        </div>
+                        {(item.portion || favorite) && <p className="item-meta">
+                          {item.portion && <span>{item.portion}</span>}
+                          {favorite && <span className="favorite-label">Любимо</span>}
+                        </p>}
                       </div>
                       <strong className="item-price">{formatEuro(item.priceCents)}</strong>
                       <QuantityControl item={item} quantity={quantity} onChange={(value) => setQuantity(item.id, value)} />
