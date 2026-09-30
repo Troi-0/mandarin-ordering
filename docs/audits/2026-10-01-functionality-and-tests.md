@@ -6,13 +6,16 @@ Live site: https://troi-0.github.io/mandarin-ordering/.
 
 ## Follow-up fixes — 1 October 2026
 
-F1 (Pages release gate), F3 (remembered-name opt-out across tabs), and F4 (unsaved favorites across tabs) have been implemented and locally verified. Hosted release and negative-control run evidence will be added after publication. The original audit evidence below is retained as a baseline.
+F1 (Pages release gate), F3 (remembered-name opt-out across tabs), and F4 (unsaved favorites across tabs) are fixed and verified locally, in real browser tabs, and through hosted release-gate checks. The code release is `2d5014d96669889d7194c6062aa5440c545fd0af` (following `34d586d`). The original audit evidence below is retained as a baseline.
 
 - **Pages:** Every push, manual run and menu repository-dispatch now installs both packages and runs the complete `npm run check` before uploading `dist`. The deploy job requires this successful build job. The checks and artifact use one checkout; no condition or continue-on-error bypasses this gate. The separate Validate workflow remains in place for PRs.
 - **Remembered name:** Explicit consent is kept in `mandarin-remember-name-v1`, separately from the existing saved-name key. Opt-out writes a durable false marker and removes the saved name. Old saved names remain readable. Name edits cannot write consent; they verify it before and after saving, including an interleaved opt-out or clear. Storage events synchronize the checkbox without replacing the current basket name. Only a fresh checkbox opt-in enables remembering again. Opt-out always attempts saved-name deletion even when a full store refuses its marker. If either write or cleanup is refused, the warning reports that limitation.
 - **Favorites:** Failed additions and removals remain pending per dish. Events merge the latest saved list with that local intent, retain the warning, and do not echo ordinary storage writes. An external clear removes saved favorites while preserving unsaved choices for the current page. The next heart action retries the merged list, including absent-menu favorites; pending changes and the warning are cleared only after a successful save. Web Storage is not a general transactional multi-tab basket store.
 - **Complete verification:** Final `npm run check` passed with **334 tests** (240 root, 91 scheduler unit, 3 workerd), lint, zero-cost policy, menu validation, TypeScript, production build and Worker dry-run bundle. Root coverage: 90.54% lines, 83.33% branches, 89.49% statements, 94.59% functions. Scheduler coverage remains 99.41% lines / 94.89% branches.
 - **Regression evidence:** Twelve assertions failed before fixes (including the existing Pages contract changed to require checks). The final suite adds 16 cases over the 318-test baseline, covering failed add/remove, external add/remove/clear, failed event reads, pre-event edits, explicit re-opt-in, blocked storage recovery, legacy-name writes after opt-out, interleaved opt-out/clear, and failed name writes. The full check log is linked below.
+- **Hosted positive control:** [Validate 36780816889](https://github.com/Troi-0/mandarin-ordering/actions/runs/36780816889) and [Pages 36780817044](https://github.com/Troi-0/mandarin-ordering/actions/runs/36780817044) succeeded for exactly `2d5014d96669889d7194c6062aa5440c545fd0af`. In Pages, `npm run check` succeeded before configure/upload, followed by successful deployment.
+- **Hosted negative control:** A temporary branch based on that release added one deliberately failing behavioral test, without merging it. [Manual Pages run 36781062466](https://github.com/Troi-0/mandarin-ordering/actions/runs/36781062466), SHA `5f3818474af030367eaea98b6fef807194912b99`, failed specifically on that assertion (240 other root tests passed). Its check step failed, configure/upload steps were skipped, the deploy job was skipped, and the artifact API returned **zero artifacts**. The test branch/worktree are removed after verification; the failing fixture is not in master.
+- **Live artifact proof:** The live `index.html`, `assets/index-EjKpO_1A.js`, and `assets/index-mpu7ZYoE.css` match the successful Pages artifact byte for byte. JavaScript SHA-256: `9d174aa56f2f57e113d112804537c8939812ba741b5c0424be1f1fa795773886`; it includes the new name-consent marker. A fresh live browser shows October 1's waiting state with no console warnings/errors. Today's menu is not yet available, so post-deployment menu interactions were not claimed.
 - **Browser evidence:** Real separate tabs on an isolated `127.0.0.1` origin verified opt-out → edit in another tab → fresh tab remains opted out, failed favorite add/remove → another tab's update → retained local intent and warning, then successful saving and reload. Favorite storage errors were deliberately simulated in a temporary local fixture using the production MenuApp component. The fixture used a synthetic menu because October 1's production page correctly shows waiting for today's menu; no menu data/date was changed. Temporary fixture files and server are removed after testing. These are local component-in-browser checks, not claims of live-menu interaction after deployment.
 
 Current remaining findings: **F2, F5, F6, F7 and F8**. Browser CI, screen-reader/share-sheet validation, importer orchestration coverage and reviewed OCR fixtures also remain recommended test improvements.
@@ -21,7 +24,7 @@ External behavior was checked through Context7 against current [GitHub Actions j
 
 ## Original assessment
 
-The normal ordering-helper flows work, and the suite has meaningful failure-path coverage. It is not yet justified to say every feature meets the applicable standards or every important edge case is covered. The audit found four state/release problems, two accessibility gaps, an intentional OCR validation limitation, and a smaller copy-recovery focus gap. Six additional probes fail against the current code; they are separate from the passing repository suite.
+The normal ordering-helper flows work, and the suite has meaningful failure-path coverage. It is not yet justified to say every feature meets the applicable standards or every important edge case is covered. The audit found four state/release problems, two accessibility gaps, an intentional OCR validation limitation, and a smaller copy-recovery focus gap. Six additional probes failed against the originally audited code; they are separate from the passing repository suite.
 
 During the original audit, no application, workflow, or menu source was changed. Temporary probes were removed from the repository and retained alongside this report. The pre-existing untracked CLAUDE.md was preserved. No import, provider request, deployment, or scheduler change was triggered.
 
@@ -65,7 +68,7 @@ During the original audit, no application, workflow, or menu source was changed.
 
 Source: [deploy-pages.yml](/Users/hristo/projects/mandarin-ordering/.github/workflows/deploy-pages.yml:44), [workflow regression](/Users/hristo/projects/mandarin-ordering/scripts/workflows.test.ts:101).
 
-Previously, Pages ran only `npm run build` while behavioral validation ran separately. Pages now runs `npm run check`, which also builds the artifact, in the publishing workflow itself. Default GitHub success gating prevents artifact upload after a failed step and skips the deploy job when its required build fails. This applies equally to push, workflow_dispatch and repository_dispatch. Contract tests protect the dependency, single checkout, complete dependencies, check-before-upload ordering and absence of conditional/failure bypasses.
+Previously, Pages ran only `npm run build` while behavioral validation ran separately. Pages now runs `npm run check`, which also builds the artifact, in the publishing workflow itself. Default GitHub success gating prevents artifact upload after a failed step and skips the deploy job when its required build fails. This applies equally to push, workflow_dispatch and repository_dispatch. Contract tests protect the dependency, single checkout, complete dependencies, check-before-upload ordering and absence of conditional/failure bypasses. The hosted positive and negative controls above independently confirm successful publication and failed-test → skipped artifact/deploy behavior.
 
 ### F2 — P2: An open page does not expire its menu
 
@@ -127,7 +130,7 @@ Choose either to discard results for a closed view or to focus/select the recove
 
 ## Test additions in priority order
 
-1. Completed locally in this follow-up: publishing requires successful checks for its checkout, including dispatch/manual paths; hosted evidence is recorded after publication.
+1. Completed and verified in this follow-up: publishing requires successful checks for its checkout, including dispatch/manual paths. Hosted success and deliberately failing-check evidence are recorded above.
 2. Promote the reproduced state/accessibility probes into regression tests alongside each fix. The OCR probe requires a deliberate change to the existing validation policy.
 3. Add CI browser smoke tests in Chromium and WebKit: selection→basket→Copy, draft/name/favorite reload, mobile dialog inertness/Escape/focus, failed copy recovery, tab preference changes, sticky anchors, and 320/390/900/901px breakpoints. Include a short desktop viewport and many basket lines.
 4. Add accessibility checks for contrast, status announcements and focus. Automated checks should be complemented by a real screen-reader pass, zoom and reduced-motion checks.
@@ -136,6 +139,10 @@ Choose either to discard results for a closed view or to focus/select the recove
 
 ## Evidence files
 
+- [Release Pages job/step evidence](/private/tmp/mandarin-audit-2026-09-30/release-pages.json)
+- [Negative-control job/step evidence](/private/tmp/mandarin-audit-2026-09-30/negative-pages.json)
+- [Negative-control assertion failure](/private/tmp/mandarin-audit-2026-09-30/negative-pages-failure.log)
+- [Live artifact checksums](/private/tmp/mandarin-audit-2026-09-30/live-artifact-verification.json)
 - [Fix verification log](/private/tmp/mandarin-audit-2026-09-30/fixes-check.log)
 - [Pre-fix selected regressions](/private/tmp/mandarin-audit-2026-09-30/selected-before-fixes.log)
 - [Favorites retained after another tab updated storage](/private/tmp/mandarin-audit-2026-09-30/favorites-tab-recovery.png)
@@ -145,4 +152,4 @@ Choose either to discard results for a closed view or to focus/select the recove
 - [Mobile browser check](/private/tmp/mandarin-audit-2026-09-30/mobile-check.png)
 - [Open-tab menu after midnight](/private/tmp/mandarin-audit-2026-09-30/open-tab-after-midnight.png)
 
-To replay the probes, copy edge-probes.test.tsx to src/audit-edge-probes.test.tsx, run `npm test -- src/audit-edge-probes.test.tsx`, then remove that temporary file. Their assertions encode proposed stronger behavior and are expected to fail before fixes; they are not part of the passing 318-test baseline.
+To replay the probes, copy edge-probes.test.tsx to src/audit-edge-probes.test.tsx, run `npm test -- src/audit-edge-probes.test.tsx`, then remove that temporary file. Their assertions encode proposed stronger behavior and failed before these fixes; they were not part of the passing 318-test baseline. F3 and F4 are now protected by passing repository regressions; the other probe scenarios remain open. The OCR probe requires a policy decision.
