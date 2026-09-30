@@ -1,6 +1,6 @@
 import { afterEach, describe, expect, it, vi } from 'vitest'
 import { menuFixture } from '../test/menu-fixture.ts'
-import { clearDraft, loadDraft, saveDraft } from './storage.ts'
+import { clearDraft, loadDraft, loadNamePreference, saveDraft, saveNamePreference } from './storage.ts'
 
 afterEach(() => vi.restoreAllMocks())
 
@@ -104,6 +104,9 @@ describe('local basket lifetime', () => {
       expect(loadDraft(menuFixture)).toEqual({ draft: null, adjusted: false, available: false })
       expect(saveDraft({ date: menuFixture.date, quantities: {}, participantName: '', note: '' }, menuFixture)).toBe(false)
       expect(clearDraft()).toBe(false)
+      expect(loadNamePreference()).toMatchObject({ remember: false, available: false })
+      expect(saveNamePreference('Иван', true)).toBe(false)
+      expect(saveNamePreference('', false)).toBe(false)
     } finally {
       Object.defineProperty(globalThis, 'localStorage', descriptor)
     }
@@ -127,5 +130,34 @@ describe('local basket lifetime', () => {
     vi.spyOn(localStorage, 'setItem').mockImplementation(() => { throw new DOMException('full', 'QuotaExceededError') })
     expect(saveDraft({ date: menuFixture.date, quantities: { soup: 1 }, participantName: '', note: '' }, menuFixture)).toBe(false)
     expect(localStorage.getItem('unrelated')).toBe('keep')
+  })
+})
+
+describe('remembered participant name', () => {
+  it('is opt-in, survives daily draft expiry, and removes only the preference when disabled', () => {
+    expect(loadNamePreference()).toEqual({ participantName: '', remember: false, available: true })
+    saveDraft({ date: menuFixture.date, quantities: { soup: 1 }, participantName: 'Иван', note: '' }, menuFixture)
+    expect(saveNamePreference('  Иван  ', true)).toBe(true)
+    expect(loadDraft({ ...menuFixture, date: '2026-08-25' }).draft).toBeNull()
+    expect(loadNamePreference()).toEqual({ participantName: 'Иван', remember: true, available: true })
+    localStorage.setItem('unrelated', 'keep')
+    expect(saveNamePreference('Иван', false)).toBe(true)
+    expect(loadNamePreference().remember).toBe(false)
+    expect(localStorage.getItem('unrelated')).toBe('keep')
+  })
+
+  it.each(['{broken', 'null', '42', '{"name":"Иван"}'])('discards malformed name preferences: %s', (raw) => {
+    localStorage.setItem('mandarin-participant-name-v1', raw)
+    expect(loadNamePreference()).toEqual({ participantName: '', remember: false, available: true })
+    expect(localStorage.getItem('mandarin-participant-name-v1')).toBeNull()
+  })
+
+  it('reports storage failures for saving, opting out, and malformed cleanup', () => {
+    localStorage.setItem('mandarin-participant-name-v1', 'null')
+    vi.spyOn(localStorage, 'setItem').mockImplementation(() => { throw new DOMException('full', 'QuotaExceededError') })
+    vi.spyOn(localStorage, 'removeItem').mockImplementation(() => { throw new DOMException('blocked', 'SecurityError') })
+    expect(saveNamePreference('Иван', true)).toBe(false)
+    expect(saveNamePreference('', false)).toBe(false)
+    expect(loadNamePreference().available).toBe(false)
   })
 })

@@ -113,7 +113,10 @@ button:focus-visible, a:focus-visible, input:focus-visible, textarea:focus-visib
 .basket-form { display: grid; gap: .4rem; padding-top: 1rem; }
 .basket-form label { margin-top: .4rem; font-size: .75rem; font-weight: 800; }
 .basket-form label span { color: var(--muted); font-weight: 500; }
-.basket-form input, .basket-form textarea { width: 100%; padding: .7rem .75rem; color: var(--ink); background: white; border: 1px solid var(--line); border-radius: .55rem; }
+.basket-form input:not([type="checkbox"]), .basket-form textarea { width: 100%; padding: .7rem .75rem; color: var(--ink); background: white; border: 1px solid var(--line); border-radius: .55rem; }
+.basket-form .remember-name { display: flex; gap: .5rem; align-items: center; color: var(--muted); font-weight: 500; cursor: pointer; }
+.remember-name input { width: 1rem; height: 1rem; margin: 0; accent-color: var(--green); }
+.remember-name-note { margin-left: 1.5rem; color: var(--muted); font-size: .66rem; }
 .basket-form textarea { min-height: 4.2rem; resize: vertical; }
 .basket-form [aria-invalid="true"] { border-color: #b62222; }
 .field-error { color: #a21b1b; }
@@ -127,6 +130,9 @@ button:focus-visible, a:focus-visible, input:focus-visible, textarea:focus-visib
 .manual-copy .text-button { justify-self: start; }
 .share-button { display: flex; width: 100%; justify-content: space-between; margin-top: 1rem; padding: .9rem 1rem; color: white; background: var(--orange); border: 0; border-radius: .65rem; font-weight: 900; cursor: pointer; box-shadow: 0 8px 20px rgb(243 111 42 / 25%); }
 .share-button:hover { background: var(--orange-dark); }
+.native-share-button { display: flex; width: 100%; justify-content: space-between; margin-top: .6rem; padding: .75rem 1rem; color: var(--green); background: transparent; border: 1px solid var(--line); border-radius: .65rem; font-weight: 800; cursor: pointer; }
+.native-share-button:hover { background: #edf5dc; }
+.native-share-button:disabled { color: var(--muted); cursor: wait; }
 .privacy-note { margin: .65rem 0 0; color: var(--muted); font-size: .66rem; line-height: 1.4; text-align: center; }
 .mobile-basket-button, .mobile-basket { display: none; }
 

@@ -22,7 +22,7 @@ import {
   summaryToText,
   type Quantities,
 } from './lib/order.ts'
-import { clearDraft, loadDraft, saveDraft } from './lib/storage.ts'
+import { clearDraft, loadDraft, loadNamePreference, saveDraft, saveNamePreference } from './lib/storage.ts'
 
 type Notice = { kind: 'success' | 'error'; text: string } | null
 
@@ -179,8 +179,11 @@ export function MenuApp({ menu }: { menu: Menu }) {
 
 function MenuContent({ menu }: { menu: Menu }) {
   const [initialDraft] = useState(() => loadDraft(menu))
+  const [initialName] = useState(() => loadNamePreference())
   const [quantities, setQuantities] = useState<Quantities>(initialDraft.draft?.quantities ?? {})
-  const [participantName, setParticipantName] = useState(initialDraft.draft?.participantName ?? '')
+  const [participantName, setParticipantName] = useState(initialDraft.draft?.participantName ?? initialName.participantName)
+  const [rememberName, setRememberName] = useState(initialName.remember)
+  const [nameStorageAvailable, setNameStorageAvailable] = useState(initialName.available)
   const [note, setNote] = useState(initialDraft.draft?.note ?? '')
   const [storageAvailable, setStorageAvailable] = useState(initialDraft.available)
   const [draftAdjusted, setDraftAdjusted] = useState(initialDraft.adjusted)
@@ -188,6 +191,7 @@ function MenuContent({ menu }: { menu: Menu }) {
   const [notice, setNotice] = useState<Notice>(null)
   const [nameError, setNameError] = useState(false)
   const [manualCopy, setManualCopy] = useState<{ text: string; view: 'desktop' | 'mobile' } | null>(null)
+  const [sharing, setSharing] = useState(false)
   const copyAttempt = useRef(0)
   const mobileDialog = useRef<HTMLDialogElement>(null)
   const [search, setSearch] = useState('')
@@ -212,6 +216,10 @@ function MenuContent({ menu }: { menu: Menu }) {
   useEffect(() => {
     setStorageAvailable(saveDraft({ date: menu.date, quantities, participantName, note }, menu))
   }, [menu, note, participantName, quantities])
+
+  useEffect(() => {
+    setNameStorageAvailable(saveNamePreference(participantName, rememberName))
+  }, [participantName, rememberName])
 
   useEffect(() => {
     if (!basketOpen) return
@@ -273,7 +281,7 @@ function MenuContent({ menu }: { menu: Menu }) {
   function resetOrder() {
     setClearedDraft({ quantities, participantName, note })
     setQuantities({})
-    setParticipantName('')
+    if (!rememberName) setParticipantName('')
     setNote('')
     clearCopyFeedback()
     setDraftAdjusted(false)
@@ -314,25 +322,30 @@ function MenuContent({ menu }: { menu: Menu }) {
     }
   }
 
-  async function copyOrder(view: 'desktop' | 'mobile') {
-    const attempt = ++copyAttempt.current
-    setManualCopy(null)
+  function orderText(view: 'desktop' | 'mobile'): string | null {
     const nameInput = document.getElementById(`${view}-participant-name`)!
     const cleanName = participantName.trim()
     if (!cleanName) {
       setNameError(true)
       setNotice({ kind: 'error', text: 'Добави име, за да се знае чий е изборът.' })
       nameInput.focus()
-      return
+      return null
     }
+    setNameError(false)
     if (orderLines.length === 0) {
       setNotice({ kind: 'error', text: 'Избери поне едно ястие.' })
-      return
+      return null
     }
+    return summaryToText(createOrderSummary(menu, quantities, cleanName, note))
+  }
 
-    setNameError(false)
-    const summary = createOrderSummary(menu, quantities, cleanName, note)
-    const text = summaryToText(summary)
+  async function copyOrder(view: 'desktop' | 'mobile') {
+    const attempt = ++copyAttempt.current
+    setManualCopy(null)
+    setNotice(null)
+    const text = orderText(view)
+    if (text === null) return
+    const nameInput = document.getElementById(`${view}-participant-name`)!
     try {
       await copyText(text, nameInput.closest('.basket-content') as HTMLElement)
       if (attempt !== copyAttempt.current) return
@@ -341,6 +354,28 @@ function MenuContent({ menu }: { menu: Menu }) {
       if (attempt !== copyAttempt.current) return
       setManualCopy({ text, view })
       setNotice({ kind: 'error', text: 'Автоматичното копиране не успя. Копирай обобщението ръчно.' })
+    }
+  }
+
+  async function shareOrder(view: 'desktop' | 'mobile') {
+    if (sharing) return
+    const attempt = ++copyAttempt.current
+    setManualCopy(null)
+    setNotice(null)
+    const text = orderText(view)
+    if (text === null) return
+    setSharing(true)
+    try {
+      // Call directly from the click so the browser retains user activation.
+      await navigator.share({ title: `Обяд за ${menu.date}`, text })
+      if (attempt === copyAttempt.current) {
+        setNotice({ kind: 'success', text: 'Обобщението е предадено за споделяне.' })
+      }
+    } catch (error) {
+      if (attempt !== copyAttempt.current || (typeof error === 'object' && error !== null && 'name' in error && error.name === 'AbortError')) return
+      setNotice({ kind: 'error', text: 'Споделянето не успя. Използвай „Копирай избора“.' })
+    } finally {
+      setSharing(false)
     }
   }
 
@@ -368,7 +403,7 @@ function MenuContent({ menu }: { menu: Menu }) {
         )}
 
         {draftAdjusted && <p className="notice notice--warning" role="status">Менюто или запазеният избор е променен. Провери ястията и сумата.</p>}
-        {!storageAvailable && <p className="notice notice--warning" role="status">Браузърът не позволява запазване на избора. Копирай го, преди да затвориш страницата.</p>}
+        {(!storageAvailable || !nameStorageAvailable) && <p className="notice notice--warning" role="status">Браузърът не позволява запазване на промените. Копирай избора, преди да затвориш страницата.</p>}
 
         {orderLines.length === 0 ? (
           <div className="basket-empty">
@@ -418,6 +453,11 @@ function MenuContent({ menu }: { menu: Menu }) {
             }}
           />
           {nameError && <small id={nameErrorId} className="field-error">Името е задължително.</small>}
+          <label className="remember-name">
+            <input type="checkbox" checked={rememberName} aria-describedby={`${view}-remember-note`} onChange={(event) => setRememberName(event.target.checked)} />
+            Запомни името ми
+          </label>
+          <small id={`${view}-remember-note`} className="remember-name-note">За следващите дни в този браузър.</small>
           <label htmlFor={noteInputId}>Бележка <span>(по желание)</span></label>
           <textarea
             id={noteInputId}
@@ -448,6 +488,11 @@ function MenuContent({ menu }: { menu: Menu }) {
         <button className="share-button" type="button" onClick={() => copyOrder(view)}>
           <span>Копирай избора</span><span aria-hidden="true">⧉</span>
         </button>
+        {typeof navigator.share === 'function' && (
+          <button className="native-share-button" type="button" disabled={sharing} onClick={() => shareOrder(view)}>
+            <span>{sharing ? 'Отваряне…' : 'Сподели избора'}</span><span aria-hidden="true">↗</span>
+          </button>
+        )}
         <p className="privacy-note">Нищо не се изпраща автоматично и не се съхранява онлайн.</p>
       </div>
     )

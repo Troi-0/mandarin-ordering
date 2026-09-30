@@ -9,6 +9,36 @@ interface BasketDraft {
 }
 
 const STORAGE_KEY = 'mandarin-order-draft-v1'
+const NAME_KEY = 'mandarin-participant-name-v1'
+
+export function loadNamePreference(storage?: Storage): { participantName: string; remember: boolean; available: boolean } {
+  const empty = { participantName: '', remember: false, available: true }
+  try {
+    const store = storage ?? localStorage
+    const raw = store.getItem(NAME_KEY)
+    if (raw === null) return empty
+    let parsed: unknown
+    try { parsed = JSON.parse(raw) } catch { parsed = null }
+    if (typeof parsed !== 'string') {
+      store.removeItem(NAME_KEY)
+      return empty
+    }
+    return { participantName: parsed.trim(), remember: true, available: true }
+  } catch {
+    return { ...empty, available: false }
+  }
+}
+
+export function saveNamePreference(participantName: string, remember: boolean, storage?: Storage): boolean {
+  try {
+    const store = storage ?? localStorage
+    if (remember) store.setItem(NAME_KEY, JSON.stringify(participantName.trim()))
+    else store.removeItem(NAME_KEY)
+    return true
+  } catch {
+    return false
+  }
+}
 
 interface DraftRecovery {
   draft: BasketDraft | null

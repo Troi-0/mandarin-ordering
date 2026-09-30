@@ -14,13 +14,21 @@ function installClipboard(writeText = vi.fn().mockResolvedValue(undefined)) {
   return writeText
 }
 
+function installSharing(share = vi.fn().mockResolvedValue(undefined)) {
+  vi.stubGlobal('navigator', Object.create(navigator, { share: { configurable: true, value: share } }))
+  return share
+}
+
 function mobileViewport() {
   const media = { matches: false, addEventListener: vi.fn(), removeEventListener: vi.fn() }
   vi.stubGlobal('matchMedia', vi.fn().mockReturnValue(media))
   return media
 }
 
-beforeEach(() => mobileViewport())
+beforeEach(() => {
+  mobileViewport()
+  vi.stubGlobal('navigator', Object.create(navigator, { share: { configurable: true, value: undefined } }))
+})
 afterEach(() => {
   vi.useRealTimers()
   vi.restoreAllMocks()
@@ -337,7 +345,8 @@ describe('interactive menu', () => {
     })
   })
 
-  it('opens the mobile dialog at its title, wraps Tab in both directions, validates the visible field, and restores focus on cancel', async () => {
+  it.each([false, true])('opens the mobile dialog, wraps Tab, validates the visible field, and restores focus with sharing %s', async (supportsSharing) => {
+    if (supportsSharing) installSharing()
     const user = userEvent.setup()
     const showModal = vi.spyOn(HTMLDialogElement.prototype, 'showModal')
     render(<MenuApp menu={menuFixture} />)
@@ -358,8 +367,9 @@ describe('interactive menu', () => {
     await user.tab({ shift: true })
     expect(basket.getByRole('button', { name: 'Затвори избора' })).toHaveFocus()
     expect(fireEvent.keyDown(basket.getByRole('button', { name: 'Затвори избора' }), { key: 'Tab', shiftKey: true })).toBe(false)
-    expect(basket.getByRole('button', { name: /Копирай избора/ })).toHaveFocus()
-    expect(fireEvent.keyDown(basket.getByRole('button', { name: /Копирай избора/ }), { key: 'Tab' })).toBe(false)
+    const lastControl = basket.getByRole('button', { name: supportsSharing ? 'Сподели избора' : 'Копирай избора' })
+    expect(lastControl).toHaveFocus()
+    expect(fireEvent.keyDown(lastControl, { key: 'Tab' })).toBe(false)
     expect(basket.getByRole('button', { name: 'Затвори избора' })).toHaveFocus()
     await user.click(basket.getByRole('button', { name: /Копирай избора/ }))
     expect(basket.getByLabelText(/Твоето име/)).toHaveFocus()
@@ -489,5 +499,131 @@ describe('interactive menu', () => {
     expect(writeText.mock.calls[0][0]).not.toContain('Пилешко филе')
     expect(writeText.mock.calls[0][0]).toContain('Бележка: Без хляб')
     expect(JSON.parse(localStorage.getItem('mandarin-order-draft-v1')!).quantities).toEqual({ soup: 2 })
+  })
+
+  it.each([false, true])('restores the next-day name only when remembering is %s, without carrying over choices or notes', async (remember) => {
+    const user = userEvent.setup()
+    const view = render(<MenuApp menu={menuFixture} />)
+    const checkbox = screen.getByRole('checkbox', { name: 'Запомни името ми' })
+    expect(checkbox).not.toBeChecked()
+    await user.type(screen.getByLabelText(/Твоето име/), 'Иван')
+    if (remember) await user.click(checkbox)
+    await user.click(screen.getByRole('button', { name: 'Добави Пилешка супа' }))
+    await user.type(screen.getByLabelText(/Бележка/), 'Без хляб')
+    view.rerender(<MenuApp menu={{ ...menuFixture, date: '2026-08-25' }} />)
+    expect(screen.getByLabelText(/Твоето име/)).toHaveValue(remember ? 'Иван' : '')
+    expect(screen.getByLabelText(/Бележка/)).toHaveValue('')
+    expect(screen.getByText('Добави нещо вкусно от менюто.')).toBeInTheDocument()
+    expect(screen.getByRole('checkbox', { name: 'Запомни името ми' })).toHaveProperty('checked', remember)
+  })
+
+  it('keeps the remembered name after Clear, updates it in the mobile basket, and forgets it after opting out', async () => {
+    const user = userEvent.setup()
+    const view = render(<MenuApp menu={menuFixture} />)
+    await user.type(screen.getByLabelText(/Твоето име/), 'Иван')
+    await user.click(screen.getByRole('checkbox', { name: 'Запомни името ми' }))
+    await user.click(screen.getByRole('button', { name: 'Добави Пилешка супа' }))
+    await user.click(screen.getByRole('button', { name: 'Изчисти' }))
+    expect(screen.getByLabelText(/Твоето име/)).toHaveValue('Иван')
+    await user.click(screen.getByRole('button', { name: /0 избора/ }))
+    const basket = within(screen.getByRole('dialog', { name: 'Обядът ти' }))
+    expect(basket.getByRole('checkbox', { name: 'Запомни името ми' })).toBeChecked()
+    await user.clear(basket.getByLabelText(/Твоето име/))
+    await user.type(basket.getByLabelText(/Твоето име/), 'Мария')
+    view.rerender(<MenuApp menu={{ ...menuFixture, date: '2026-08-25' }} />)
+    expect(screen.getByLabelText(/Твоето име/)).toHaveValue('Мария')
+    await user.click(screen.getByRole('checkbox', { name: 'Запомни името ми' }))
+    expect(screen.getByLabelText(/Твоето име/)).toHaveValue('Мария')
+    view.rerender(<MenuApp menu={{ ...menuFixture, date: '2026-08-26' }} />)
+    expect(screen.getByLabelText(/Твоето име/)).toHaveValue('')
+    expect(screen.getByRole('checkbox', { name: 'Запомни името ми' })).not.toBeChecked()
+  })
+
+  it('keeps the basket usable and warns when only the remembered-name write fails', async () => {
+    const user = userEvent.setup()
+    const setItem = localStorage.setItem.bind(localStorage)
+    vi.spyOn(localStorage, 'setItem').mockImplementation((key, value) => {
+      if (key === 'mandarin-participant-name-v1') throw new DOMException('full', 'QuotaExceededError')
+      setItem(key, value)
+    })
+    render(<MenuApp menu={menuFixture} />)
+    await user.type(screen.getByLabelText(/Твоето име/), 'Иван')
+    await user.click(screen.getByRole('checkbox', { name: 'Запомни името ми' }))
+    expect(screen.getByText(/Браузърът не позволява запазване/)).toBeInTheDocument()
+    await user.click(screen.getByRole('button', { name: 'Добави Пилешка супа' }))
+    expect(screen.getByLabelText('Избрано количество: 1')).toHaveTextContent('1')
+  })
+
+  it('keeps Copy available without a Share button on unsupported browsers', () => {
+    render(<MenuApp menu={menuFixture} />)
+    expect(screen.queryByRole('button', { name: 'Сподели избора' })).not.toBeInTheDocument()
+    expect(screen.getByRole('button', { name: 'Копирай избора' })).toBeInTheDocument()
+  })
+
+  it.each(['desktop', 'mobile'])('validates and shares exactly the copied summary from the %s basket', async (mode) => {
+    const user = userEvent.setup()
+    const share = installSharing()
+    const writeText = installClipboard()
+    render(<MenuApp menu={menuFixture} />)
+    await user.click(screen.getByRole('button', { name: 'Добави Пилешка супа' }))
+    if (mode === 'mobile') await user.click(screen.getByRole('button', { name: /1 избор/ }))
+    const basket = within(mode === 'mobile' ? screen.getByRole('dialog', { name: 'Обядът ти' }) : screen.getByRole('complementary', { name: 'Обобщение на избора' }))
+    await user.click(basket.getByRole('button', { name: 'Сподели избора' }))
+    expect(share).not.toHaveBeenCalled()
+    expect(basket.getByLabelText(/Твоето име/)).toHaveFocus()
+    await user.type(basket.getByLabelText(/Твоето име/), 'Иван')
+    await user.type(basket.getByLabelText(/Бележка/), 'Без хляб')
+    await user.click(basket.getByRole('button', { name: 'Сподели избора' }))
+    expect(share).toHaveBeenCalledOnce()
+    expect(share).toHaveBeenCalledWith({ title: `Обяд за ${menuFixture.date}`, text: expect.stringContaining('1 × Пилешка супа') })
+    expect(basket.getByText('Обобщението е предадено за споделяне.')).toBeInTheDocument()
+    expect(writeText).not.toHaveBeenCalled()
+    await user.click(basket.getByRole('button', { name: 'Копирай избора' }))
+    expect(writeText).toHaveBeenCalledWith(share.mock.calls[0][0].text)
+  })
+
+  it('does not open sharing for an empty basket', async () => {
+    const user = userEvent.setup()
+    const share = installSharing()
+    render(<MenuApp menu={menuFixture} />)
+    await user.type(screen.getByLabelText(/Твоето име/), 'Иван')
+    await user.click(screen.getByRole('button', { name: 'Сподели избора' }))
+    expect(share).not.toHaveBeenCalled()
+    expect(screen.getByText('Избери поне едно ястие.')).toBeInTheDocument()
+  })
+
+  it.each(['AbortError', 'NotAllowedError', 'DataError'])('handles native sharing rejection %s and leaves Copy usable', async (errorName) => {
+    const user = userEvent.setup()
+    const share = installSharing(vi.fn().mockRejectedValue(new DOMException('sharing stopped', errorName)))
+    const writeText = installClipboard()
+    render(<MenuApp menu={menuFixture} />)
+    await user.click(screen.getByRole('button', { name: 'Добави Пилешка супа' }))
+    await user.type(screen.getByLabelText(/Твоето име/), 'Иван')
+    await user.click(screen.getByRole('button', { name: 'Сподели избора' }))
+    expect(share).toHaveBeenCalledOnce()
+    expect(writeText).not.toHaveBeenCalled()
+    expect(screen.queryByText('Обобщението е предадено за споделяне.')).not.toBeInTheDocument()
+    if (errorName === 'AbortError') expect(screen.queryByText(/Споделянето не успя/)).not.toBeInTheDocument()
+    else expect(screen.getByText(/Споделянето не успя/)).toBeInTheDocument()
+    expect(screen.getByRole('button', { name: 'Сподели избора' })).toBeEnabled()
+    await user.click(screen.getByRole('button', { name: 'Копирай избора' }))
+    expect(writeText).toHaveBeenCalledWith(expect.stringContaining('1 × Пилешка супа'))
+  })
+
+  it('prevents duplicate sharing and ignores a stale result after the basket changes', async () => {
+    const user = userEvent.setup()
+    let resolveShare!: () => void
+    const share = installSharing(vi.fn(() => new Promise<void>((resolve) => { resolveShare = resolve })))
+    render(<MenuApp menu={menuFixture} />)
+    await user.click(screen.getByRole('button', { name: 'Добави Пилешка супа' }))
+    await user.type(screen.getByLabelText(/Твоето име/), 'Иван')
+    await user.click(screen.getByRole('button', { name: 'Сподели избора' }))
+    expect(screen.getByRole('button', { name: 'Отваряне…' })).toBeDisabled()
+    await user.click(screen.getByRole('button', { name: 'Отваряне…' }))
+    expect(share).toHaveBeenCalledOnce()
+    await user.click(screen.getByRole('button', { name: 'Добави Пилешка супа' }))
+    await act(async () => resolveShare())
+    expect(screen.queryByText('Обобщението е предадено за споделяне.')).not.toBeInTheDocument()
+    expect(screen.getByRole('button', { name: 'Сподели избора' })).toBeEnabled()
   })
 })
