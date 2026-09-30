@@ -56,9 +56,9 @@ button:focus-visible, a:focus-visible, input:focus-visible, textarea:focus-visib
 .hero-wave { position: absolute; z-index: 1; right: -2%; bottom: -5.5rem; left: -2%; height: 8rem; background: var(--cream); border-radius: 50% 50% 0 0 / 100% 100% 0 0; }
 
 .page-shell { display: grid; grid-template-columns: minmax(0, 1fr) 21rem; gap: 3.5rem; align-items: start; padding: 3rem 0 6rem; }
-.section-intro { display: flex; gap: 2rem; align-items: end; justify-content: space-between; margin-bottom: 1.5rem; }
+.section-intro { display: grid; gap: .65rem; margin-bottom: 1.5rem; }
 .section-intro h2 { margin: .25rem 0 0; font-family: Georgia, serif; font-size: clamp(2.4rem, 5vw, 4rem); font-weight: 500; letter-spacing: -.05em; }
-.section-intro p { max-width: 20rem; margin: 0; color: var(--muted); font-size: .88rem; line-height: 1.6; }
+.section-intro p { max-width: 36rem; margin: 0; color: var(--muted); font-size: .88rem; line-height: 1.6; }
 .sr-only { position: absolute; width: 1px; height: 1px; padding: 0; overflow: hidden; clip-path: inset(50%); white-space: nowrap; border: 0; }
 .menu-search { position: relative; width: min(100%, 24rem); margin-bottom: 1rem; }
 .menu-search input { width: 100%; min-width: 0; height: 2.75rem; padding: .65rem 2.5rem .65rem 2.4rem; color: var(--ink); background: var(--paper); border: 1px solid var(--line); border-radius: .55rem; font: inherit; }
@@ -188,8 +188,6 @@ footer a { color: var(--orange-dark); font-weight: 800; text-decoration: none; }
   .hero h1 { font-size: clamp(3.8rem, 20vw, 5.8rem); }
   .hero-plate { position: absolute; right: -4.5rem; bottom: 1rem; width: 10rem; opacity: .28; }
   .important-banner { align-items: flex-start; }
-  .section-intro { display: block; }
-  .section-intro p { margin-top: 1rem; }
   .menu-item { grid-template-columns: minmax(0, 1fr) auto; gap: .65rem; }
   .quantity-control { grid-column: 1 / -1; justify-self: end; }
   .menu-item--selected { margin-inline: -.25rem; padding-inline: .55rem; }
