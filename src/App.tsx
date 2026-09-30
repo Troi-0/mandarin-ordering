@@ -30,29 +30,32 @@ function QuantityControl({
   item,
   quantity,
   onChange,
+  inBasket = false,
 }: {
-  item: MenuItem
+  item: Pick<MenuItem, 'name'>
   quantity: number
   onChange: (quantity: number) => void
+  inBasket?: boolean
 }) {
+  const context = inBasket ? ' в избора' : ''
   return (
-    <div className="quantity-control" aria-label={`Количество за ${item.name}`}>
+    <div className="quantity-control" aria-label={`Количество${context} за ${item.name}`}>
       <button
         className="quantity-button"
         type="button"
-        aria-label={`Намали ${item.name}`}
+        aria-label={`Намали ${item.name}${context}`}
         disabled={quantity === 0}
         onClick={() => onChange(clampQuantity(quantity - 1))}
       >
         −
       </button>
-      <output aria-live="polite" aria-label={`Избрано количество: ${quantity}`}>
+      <output aria-live="polite" aria-label={`Избрано количество${context}: ${quantity}`}>
         {quantity}
       </output>
       <button
         className="quantity-button quantity-button--add"
         type="button"
-        aria-label={`Добави ${item.name}`}
+        aria-label={`Добави ${item.name}${context}`}
         disabled={quantity >= 20}
         onClick={() => onChange(clampQuantity(quantity + 1))}
       >
@@ -177,10 +180,33 @@ export function MenuApp({ menu }: { menu: Menu }) {
   const [basketOpen, setBasketOpen] = useState(false)
   const [notice, setNotice] = useState<Notice>(null)
   const [nameError, setNameError] = useState(false)
+  const [search, setSearch] = useState('')
+  const [maxPrice, setMaxPrice] = useState('')
+  const [selectedOnly, setSelectedOnly] = useState(false)
+  const [clearedDraft, setClearedDraft] = useState<{
+    quantities: Quantities
+    participantName: string
+    note: string
+  } | null>(null)
 
   const orderLines = useMemo(() => createOrderLines(menu, quantities), [menu, quantities])
   const itemCount = orderLines.reduce((sum, line) => sum + line.quantity, 0)
   const totalCents = orderLines.reduce((sum, line) => sum + line.lineTotalCents, 0)
+  const totalMenuItems = menu.categories.reduce((sum, category) => sum + category.items.length, 0)
+  const filteredCategories = useMemo(() => {
+    const terms = search.trim().toLocaleLowerCase('bg-BG').split(/\s+/).filter(Boolean)
+    return menu.categories.map((category, index) => ({
+      ...category,
+      position: index + 1,
+      items: category.items.filter((item) => (
+        terms.every((term) => item.name.toLocaleLowerCase('bg-BG').includes(term))
+        && (!maxPrice || item.priceCents <= Number(maxPrice))
+        && (!selectedOnly || (quantities[item.id] ?? 0) > 0)
+      )),
+    })).filter((category) => category.items.length > 0)
+  }, [maxPrice, menu, quantities, search, selectedOnly])
+  const visibleMenuItems = filteredCategories.reduce((sum, category) => sum + category.items.length, 0)
+  const hasFilters = search !== '' || maxPrice !== '' || selectedOnly
 
   useEffect(() => {
     saveDraft({ date: menu.date, quantities, participantName, note })
@@ -188,6 +214,7 @@ export function MenuApp({ menu }: { menu: Menu }) {
 
   function setQuantity(itemId: string, quantity: number) {
     setNotice(null)
+    setClearedDraft(null)
     setQuantities((current) => {
       if (quantity === 0) {
         const next = { ...current }
@@ -199,12 +226,29 @@ export function MenuApp({ menu }: { menu: Menu }) {
   }
 
   function resetOrder() {
+    setClearedDraft({ quantities, participantName, note })
     setQuantities({})
     setParticipantName('')
     setNote('')
     setNotice(null)
     setNameError(false)
     clearDraft()
+  }
+
+  function restoreOrder() {
+    if (!clearedDraft) return
+    setQuantities(clearedDraft.quantities)
+    setParticipantName(clearedDraft.participantName)
+    setNote(clearedDraft.note)
+    setNameError(false)
+    setNotice(null)
+    setClearedDraft(null)
+  }
+
+  function resetFilters() {
+    setSearch('')
+    setMaxPrice('')
+    setSelectedOnly(false)
   }
 
   async function copyText(text: string) {
@@ -222,12 +266,12 @@ export function MenuApp({ menu }: { menu: Menu }) {
     textarea.remove()
   }
 
-  async function copyOrder() {
+  async function copyOrder(nameInputId: string) {
     const cleanName = participantName.trim()
     if (!cleanName) {
       setNameError(true)
       setNotice({ kind: 'error', text: 'Добави име, за да се знае чий е изборът.' })
-      document.getElementById('participant-name')?.focus()
+      document.getElementById(nameInputId)?.focus()
       return
     }
     if (orderLines.length === 0) {
@@ -246,76 +290,98 @@ export function MenuApp({ menu }: { menu: Menu }) {
     }
   }
 
-  const basket = (
-    <div className="basket-content">
-      <div className="basket-heading">
-        <div>
-          <span className="eyebrow">Твоят избор</span>
-          <h2>Обядът ти</h2>
+  function renderBasket(view: 'desktop' | 'mobile') {
+    const nameInputId = `${view}-participant-name`
+    const noteInputId = `${view}-order-note`
+    const nameErrorId = `${view}-name-error`
+    return (
+      <div className="basket-content">
+        <div className="basket-heading">
+          <div>
+            <span className="eyebrow">Твоят избор</span>
+            <h2>Обядът ти</h2>
+          </div>
+          {itemCount > 0 && (
+            <button className="text-button" type="button" onClick={resetOrder}>Изчисти</button>
+          )}
         </div>
-        {itemCount > 0 && (
-          <button className="text-button" type="button" onClick={resetOrder}>Изчисти</button>
+
+        {clearedDraft && (
+          <div className="basket-undo" role="status">
+            <span>Изборът е изчистен.</span>
+            <button className="text-button" type="button" onClick={restoreOrder}>Върни избора</button>
+          </div>
         )}
-      </div>
 
-      {orderLines.length === 0 ? (
-        <div className="basket-empty">
-          <span aria-hidden="true">＋</span>
-          <p>Добави нещо вкусно от менюто.</p>
+        {orderLines.length === 0 ? (
+          <div className="basket-empty">
+            <span aria-hidden="true">＋</span>
+            <p>Добави нещо вкусно от менюто.</p>
+          </div>
+        ) : (
+          <ul className="basket-lines" aria-label="Избрани ястия">
+            {orderLines.map((line) => (
+              <li key={line.itemId}>
+                <div className="basket-line-copy">
+                  <strong>{line.name}</strong>
+                  <small>{line.portion ? `${line.portion} · ` : ''}{formatEuro(line.unitPriceCents)} за порция</small>
+                </div>
+                <span className="basket-line-total">{formatEuro(line.lineTotalCents)}</span>
+                <div className="basket-line-actions">
+                  <QuantityControl item={line} quantity={line.quantity} onChange={(value) => setQuantity(line.itemId, value)} inBasket />
+                  <button className="text-button" type="button" aria-label={`Премахни ${line.name} от избора`} onClick={() => setQuantity(line.itemId, 0)}>
+                    Премахни
+                  </button>
+                </div>
+              </li>
+            ))}
+          </ul>
+        )}
+
+        <div className="basket-total">
+          <span>Общо</span>
+          <strong>{formatEuro(totalCents)}</strong>
         </div>
-      ) : (
-        <ul className="basket-lines" aria-label="Избрани ястия">
-          {orderLines.map((line) => (
-            <li key={line.itemId}>
-              <div>
-                <strong>{line.quantity} × {line.name}</strong>
-                {line.portion && <small>{line.portion}</small>}
-              </div>
-              <span>{formatEuro(line.lineTotalCents)}</span>
-            </li>
-          ))}
-        </ul>
-      )}
 
-      <div className="basket-total">
-        <span>Общо</span>
-        <strong>{formatEuro(totalCents)}</strong>
+        <div className="basket-form">
+          <label htmlFor={nameInputId}>Твоето име <span aria-hidden="true">*</span></label>
+          <input
+            id={nameInputId}
+            name="participantName"
+            value={participantName}
+            aria-invalid={nameError}
+            aria-describedby={nameError ? nameErrorId : undefined}
+            autoComplete="name"
+            placeholder="Напр. Иван"
+            onChange={(event) => {
+              setClearedDraft(null)
+              setParticipantName(event.target.value)
+              if (event.target.value.trim()) setNameError(false)
+            }}
+          />
+          {nameError && <small id={nameErrorId} className="field-error">Името е задължително.</small>}
+          <label htmlFor={noteInputId}>Бележка <span>(по желание)</span></label>
+          <textarea
+            id={noteInputId}
+            name="orderNote"
+            value={note}
+            maxLength={240}
+            placeholder="Напр. без люто"
+            onChange={(event) => {
+              setClearedDraft(null)
+              setNote(event.target.value)
+            }}
+          />
+        </div>
+
+        {notice && <p className={`notice notice--${notice.kind}`} role="status">{notice.text}</p>}
+        <button className="share-button" type="button" onClick={() => copyOrder(nameInputId)}>
+          <span>Копирай избора</span><span aria-hidden="true">⧉</span>
+        </button>
+        <p className="privacy-note">Нищо не се изпраща автоматично и не се съхранява онлайн.</p>
       </div>
-
-      <div className="basket-form">
-        <label htmlFor="participant-name">Твоето име <span aria-hidden="true">*</span></label>
-        <input
-          id="participant-name"
-          name="participantName"
-          value={participantName}
-          aria-invalid={nameError}
-          aria-describedby={nameError ? 'name-error' : undefined}
-          autoComplete="name"
-          placeholder="Напр. Иван"
-          onChange={(event) => {
-            setParticipantName(event.target.value)
-            if (event.target.value.trim()) setNameError(false)
-          }}
-        />
-        {nameError && <small id="name-error" className="field-error">Името е задължително.</small>}
-        <label htmlFor="order-note">Бележка <span>(по желание)</span></label>
-        <textarea
-          id="order-note"
-          name="orderNote"
-          value={note}
-          maxLength={240}
-          placeholder="Напр. без люто"
-          onChange={(event) => setNote(event.target.value)}
-        />
-      </div>
-
-      {notice && <p className={`notice notice--${notice.kind}`} role="status">{notice.text}</p>}
-      <button className="share-button" type="button" onClick={copyOrder}>
-        <span>Копирай избора</span><span aria-hidden="true">⧉</span>
-      </button>
-      <p className="privacy-note">Нищо не се изпраща автоматично и не се съхранява онлайн.</p>
-    </div>
-  )
+    )
+  }
 
   return (
     <>
@@ -360,16 +426,53 @@ export function MenuApp({ menu }: { menu: Menu }) {
             <p>Цените и грамажите са преписани от днешната публикация.</p>
           </div>
 
-          <nav className="category-nav" aria-label="Категории от менюто">
-            {menu.categories.map((category) => (
-              <a key={category.id} href={`#${category.id}`}>{category.name}</a>
-            ))}
-          </nav>
+          <div className="menu-filters" role="search" aria-label="Търсене и филтри">
+            <div className="menu-search">
+              <label htmlFor="menu-search">Търси ястие</label>
+              <input
+                id="menu-search"
+                type="search"
+                value={search}
+                placeholder="Напр. пилешко, супа…"
+                onChange={(event) => setSearch(event.target.value)}
+              />
+            </div>
+            <div className="menu-price-filter">
+              <label htmlFor="menu-max-price">Максимална цена</label>
+              <select id="menu-max-price" value={maxPrice} onChange={(event) => setMaxPrice(event.target.value)}>
+                <option value="">Без ограничение</option>
+                {[300, 500, 700, 1000].map((price) => (
+                  <option key={price} value={price}>До {formatEuro(price)}</option>
+                ))}
+              </select>
+            </div>
+            <label className="selected-filter">
+              <input type="checkbox" checked={selectedOnly} onChange={(event) => setSelectedOnly(event.target.checked)} />
+              Само избраните
+            </label>
+            <div className="filter-summary">
+              <p role="status">Показани ястия: <strong>{visibleMenuItems}</strong> от {totalMenuItems}</p>
+              {hasFilters && <button className="text-button" type="button" onClick={resetFilters}>Изчисти филтрите</button>}
+            </div>
+          </div>
 
-          {menu.categories.map((category, categoryIndex) => (
+          {filteredCategories.length > 0 ? (
+            <nav className="category-nav" aria-label="Категории от менюто">
+              {filteredCategories.map((category) => (
+                <a key={category.id} href={`#${category.id}`}>{category.name}</a>
+              ))}
+            </nav>
+          ) : (
+            <div className="menu-empty">
+              <h3>{selectedOnly && orderLines.length === 0 ? 'Още няма избрани ястия' : 'Няма намерени ястия'}</h3>
+              <p>Промени търсенето или изчисти филтрите, за да видиш менюто.</p>
+            </div>
+          )}
+
+          {filteredCategories.map((category) => (
             <section className="category-section" id={category.id} key={category.id}>
               <div className="category-title">
-                <span>{String(categoryIndex + 1).padStart(2, '0')}</span>
+                <span>{String(category.position).padStart(2, '0')}</span>
                 <h3>{category.name}</h3>
                 <div />
               </div>
@@ -393,7 +496,7 @@ export function MenuApp({ menu }: { menu: Menu }) {
 
         </section>
 
-        <aside className="basket-panel" aria-label="Обобщение на избора">{basket}</aside>
+        <aside className="basket-panel" aria-label="Обобщение на избора">{renderBasket('desktop')}</aside>
       </main>
 
       <button
@@ -413,7 +516,7 @@ export function MenuApp({ menu }: { menu: Menu }) {
         aria-label="Обобщение на избора"
       >
         <button className="mobile-basket-close" type="button" onClick={() => setBasketOpen(false)} aria-label="Затвори избора">×</button>
-        {basket}
+        {renderBasket('mobile')}
       </aside>
       {basketOpen && <button className="basket-backdrop" type="button" aria-label="Затвори избора" onClick={() => setBasketOpen(false)} />}
 
