@@ -134,6 +134,16 @@ describe('local basket lifetime', () => {
 })
 
 describe('remembered participant name', () => {
+  it('still deletes the saved name when full storage refuses a new opt-out marker', () => {
+    localStorage.setItem(NAME_KEY, '"Иван"')
+    localStorage.setItem('unrelated', 'keep')
+    vi.spyOn(localStorage, 'setItem').mockImplementation(() => { throw new DOMException('full', 'QuotaExceededError') })
+    expect(saveNamePreference('', false)).toBe(false)
+    expect(localStorage.getItem(NAME_KEY)).toBeNull()
+    expect(loadNamePreference().remember).toBe(false)
+    expect(localStorage.getItem('unrelated')).toBe('keep')
+  })
+
   it('updates only an existing opt-in and retains opt-out even if a stale client writes the legacy name', () => {
     expect(updateRememberedName('Иван')).toMatchObject({ remember: false, available: true })
     expect(localStorage.getItem(NAME_KEY)).toBeNull()

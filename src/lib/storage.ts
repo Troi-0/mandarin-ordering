@@ -42,9 +42,16 @@ export function saveNamePreference(participantName: string, remember: boolean, s
     const store = storage ?? localStorage
     // Editing a name must never write this consent marker. Only a checkbox
     // action can opt in; opt-out is retained even after the name is removed.
-    store.setItem(NAME_CONSENT_KEY, JSON.stringify(remember))
-    if (remember) store.setItem(NAME_KEY, JSON.stringify(participantName.trim()))
-    else store.removeItem(NAME_KEY)
+    if (!remember) {
+      let available = true
+      try { store.setItem(NAME_CONSENT_KEY, 'false') } catch { available = false }
+      // Full storage may refuse the marker but still permit deletion. Always
+      // attempt both operations and report any incomplete persistence.
+      try { store.removeItem(NAME_KEY) } catch { available = false }
+      return available
+    }
+    store.setItem(NAME_CONSENT_KEY, 'true')
+    store.setItem(NAME_KEY, JSON.stringify(participantName.trim()))
     return true
   } catch {
     return false
