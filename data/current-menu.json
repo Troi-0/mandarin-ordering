@@ -1,21 +1,21 @@
 {
   "status": "ready",
   "menu": {
-    "date": "2026-10-02",
+    "date": "2026-10-05",
     "restaurant": "Mandarin House",
     "currency": "EUR",
     "source": {
       "pageId": "100063668642218",
-      "postId": "1738429741622631",
-      "postUrl": "https://www.facebook.com/permalink.php?story_fbid=1738429741622631&id=100063668642218",
-      "publishedAt": "2026-10-02T05:30:02.000Z",
-      "imageSha256": "877c0a43137bb69857839bf87dac25009f5a6e8229606dc89e70ef8d5d90ab66"
+      "postId": "1741791857953086",
+      "postUrl": "https://www.facebook.com/permalink.php?story_fbid=1741791857953086&id=100063668642218",
+      "publishedAt": "2026-10-05T05:30:01.000Z",
+      "imageSha256": "09b8712c1cccf0ccde33c59d7ba7d12fe34e5f931326d13c51ea8d1b1d13c4eb"
     },
-    "importedAt": "2026-10-02T05:38:54.414Z",
+    "importedAt": "2026-10-05T06:28:42.633Z",
     "importMethod": "facebook",
     "validation": {
-      "extractedBy": "gemini-3.8-flash",
-      "verifiedBy": "gemini-3.8-flash:blind-transcription",
+      "extractedBy": "gemini-3.6-flash",
+      "verifiedBy": "gemini-3.8-flash:focused-consensus",
       "uncertain": false
     },
     "categories": [
@@ -24,16 +24,16 @@
         "name": "СУПИ",
         "items": [
           {
-            "id": "item-1f4333eb4d73",
-            "name": "Рибена чорба",
+            "id": "item-daf19079f034",
+            "name": "Пилешка супа",
             "portion": "350 мл",
             "priceCents": 270
           },
           {
-            "id": "item-2cc306a88b35",
-            "name": "Зеленчукова крем супа",
+            "id": "item-b1e896d140d0",
+            "name": "Картофена крем супа с пушено сирене",
             "portion": "350 мл",
-            "priceCents": 250
+            "priceCents": 270
           },
           {
             "id": "item-27bd3994ec83",
@@ -48,58 +48,64 @@
         "name": "ОСНОВНИ",
         "items": [
           {
-            "id": "item-c5da5b576fa2",
-            "name": "Късчета от пилешко филе с пушено сирене и сметанов сос, с гарнитура",
+            "id": "item-979ed0c16fb3",
+            "name": "1/2 Печено пиле, с гарнитура",
+            "portion": "3650 г",
+            "priceCents": 760
+          },
+          {
+            "id": "item-31ef6f2c5264",
+            "name": "Панирано пилешко филе Панко, с гарнитура",
             "portion": "350 г",
             "priceCents": 510
           },
           {
-            "id": "item-ff8a993562b7",
-            "name": "Панирано пилешко филе с корнфлейкс, с гарнитура",
+            "id": "item-2ee4bd9d7fe5",
+            "name": "Сувлаки от шарено свинско /2бр на скара/, с ½ пърленка, тирокафтери и гарнитура",
             "portion": "350 г",
-            "priceCents": 510
+            "priceCents": 580
           },
           {
-            "id": "item-764cdcb7707f",
-            "name": "Поркета от свински врат с прошуто кото и филаделфия, с гарнитура",
+            "id": "item-39b7290c3c5b",
+            "name": "Свинско печено /врат/ с гъбен сос, с гарнитура",
             "portion": "350 г",
-            "priceCents": 510
+            "priceCents": 520
           },
           {
-            "id": "item-5ca7cec5a87e",
-            "name": "Бурито с мляно месо и зеленчуци, с гарнитура",
-            "portion": "350 г",
-            "priceCents": 480
-          },
-          {
-            "id": "item-0f9e5096faf9",
-            "name": "Домашни пържени кюфтета, с гарнитура",
+            "id": "item-6b689f08fe36",
+            "name": "Мусака с тиквички, мляно месо и ориз",
             "portion": "350 г",
             "priceCents": 450
           },
           {
-            "id": "item-0dc686391500",
-            "name": "Миш-Маш с печени чушки",
+            "id": "item-e58a3e29bb0f",
+            "name": "Лазаня Болонезе",
+            "portion": "350 г",
+            "priceCents": 470
+          },
+          {
+            "id": "item-c8d107740d1f",
+            "name": "Кюфтенца от броколи с мицарела, с млечен сос и гарнитура",
+            "portion": "350 г",
+            "priceCents": 440
+          },
+          {
+            "id": "item-b6b2c434cc4d",
+            "name": "Спаначен гратин с пармезан",
             "portion": "350 г",
             "priceCents": 430
           },
           {
-            "id": "item-b8154f92bc6a",
-            "name": "Тиквички с пармезанова коричка, с млечен сос и гарнитура",
+            "id": "item-4a47ffc31411",
+            "name": "Леща яхния",
             "portion": "350 г",
-            "priceCents": 430
+            "priceCents": 400
           },
           {
-            "id": "item-6198c4ed1424",
-            "name": "Боб яхния",
+            "id": "item-22246f8c7b65",
+            "name": "Котлет от сьомга на скара, с гарнитура",
             "portion": "350 г",
-            "priceCents": 410
-          },
-          {
-            "id": "item-44d3ea083507",
-            "name": "Пържени филета от хек, с гарнитура",
-            "portion": "350 г",
-            "priceCents": 720
+            "priceCents": 820
           }
         ]
       },
@@ -192,9 +198,9 @@
         "name": "ДЕСЕРТ",
         "items": [
           {
-            "id": "item-c2c67b152b64",
-            "name": "Домана палачинка със сладко или шоколад",
-            "priceCents": 180
+            "id": "item-d20f4eb00d61",
+            "name": "Торта Линдт с малини",
+            "priceCents": 350
           },
           {
             "id": "item-42a2892ed603",
@@ -210,6 +216,11 @@
             "id": "item-0d54f91b36c6",
             "name": "Млечен пудинг с чиа и плодове",
             "priceCents": 205
+          },
+          {
+            "id": "item-a4b57f07decb",
+            "name": "Макарони на фурна",
+            "priceCents": 180
           }
         ]
       },
@@ -224,8 +235,9 @@
             "priceCents": 302
           },
           {
-            "id": "item-99693794ce75",
-            "name": "Сала Капрезе с моцарела и песто 300гр/единично опакована/",
+            "id": "item-ee8b5667cb46",
+            "name": "Сала Капрезе с моцарела и песто /единично опакована/",
+            "portion": "300 г",
             "priceCents": 450
           },
           {
