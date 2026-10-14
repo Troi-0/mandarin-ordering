@@ -12,7 +12,7 @@
       "publishedAt": "2026-10-14T05:30:03.000Z",
       "imageSha256": "077bd6e80c30d15d02f86f51c1a83d160c61c5c59412f0cfd274a364966fc522"
     },
-    "importedAt": "2026-10-14T05:50:29.858Z",
+    "importedAt": "2026-10-14T05:57:33.941Z",
     "importMethod": "facebook",
     "validation": {
       "extractedBy": "gemini-3.8-flash",
@@ -607,7 +607,7 @@
             "uncertain": false
           },
           {
-            "name": "Гриловано пилешко с бекон, кисели краставички и картофки, в тортиля, с гарнитура",
+            "name": "Гриловано пилешко с бекон,\nкисели краставички и картофки, в тортиля, с гарнитура",
             "portion": "350 г",
             "priceCents": 530,
             "uncertain": false
@@ -901,7 +901,7 @@
               "uncertain": false
             },
             {
-              "name": "Гриловано пилешко с бекон,\nкисели краставички и картофки, в тортила, с гарнитура",
+              "name": "Гриловано пилешко с бекон, кисели краставички и картофки, в тортиля, с гарнитура",
               "portion": "350 г",
               "priceCents": 530,
               "uncertain": false
@@ -938,8 +938,8 @@
             },
             {
               "name": "Миш-Маш с печени чушки",
-              "portion": null,
-              "priceCents": 350,
+              "portion": "350 г",
+              "priceCents": 470,
               "uncertain": false
             },
             {
