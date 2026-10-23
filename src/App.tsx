@@ -16,6 +16,8 @@ import {
   type MenuItem,
 } from './lib/menu-schema.ts'
 import {
+  BOX_FEE_CENTS,
+  calculateTotals,
   clampQuantity,
   createOrderLines,
   createOrderSummary,
@@ -207,7 +209,7 @@ function MenuContent({ menu }: { menu: Menu }) {
 
   const orderLines = useMemo(() => createOrderLines(menu, quantities), [menu, quantities])
   const itemCount = orderLines.reduce((sum, line) => sum + line.quantity, 0)
-  const totalCents = orderLines.reduce((sum, line) => sum + line.lineTotalCents, 0)
+  const { boxCount, boxesCents, totalCents } = calculateTotals(orderLines)
   const filteredCategories = useMemo(() => {
     const terms = search.trim().toLocaleLowerCase('bg-BG').split(/\s+/).filter(Boolean)
     return menu.categories.map((category, index) => ({
@@ -485,6 +487,13 @@ function MenuContent({ menu }: { menu: Menu }) {
           </ul>
         )}
 
+        {boxCount > 0 && (
+          <div className="basket-boxes">
+            <span>Кутии <small>{boxCount} × {formatEuro(BOX_FEE_CENTS)}</small></span>
+            <strong>{formatEuro(boxesCents)}</strong>
+          </div>
+        )}
+
         <div className="basket-total">
           <span>Общо</span>
           <strong>{formatEuro(totalCents)}</strong>
@@ -593,7 +602,7 @@ function MenuContent({ menu }: { menu: Menu }) {
               <span className="eyebrow">Прясно приготвено</span>
               <h2 id="menu-title">Днешното меню</h2>
             </div>
-            <p>Цените и грамажите са преписани от днешната публикация.</p>
+            <p>Цените и грамажите са преписани от днешната публикация. Към супите, основните и скарата се добавят {formatEuro(BOX_FEE_CENTS)} за кутия.</p>
           </div>
 
           <div className="menu-search" role="search" aria-label="Търсене в менюто">

@@ -2,6 +2,10 @@ import type { Menu, MenuItem } from './menu-schema.ts'
 
 export type Quantities = Record<string, number>
 
+export const BOX_FEE_CENTS = 10
+// The restaurant charges for takeaway boxes on top of these categories' published prices.
+const BOXED_CATEGORY_NAMES = new Set(['супи', 'основни', 'скара'])
+
 interface OrderLine {
   itemId: string
   name: string
@@ -9,15 +13,21 @@ interface OrderLine {
   quantity: number
   unitPriceCents: number
   lineTotalCents: number
+  boxCount: number
 }
 
-interface OrderSummary {
+interface OrderTotals {
+  boxCount: number
+  boxesCents: number
+  totalCents: number
+}
+
+interface OrderSummary extends OrderTotals {
   participantName: string
   note?: string
   menuDate: string
   sourceUrl: string
   lines: OrderLine[]
-  totalCents: number
 }
 
 const euroFormatter = new Intl.NumberFormat('bg-BG', {
@@ -34,15 +44,23 @@ export function clampQuantity(value: number): number {
   return Math.max(0, Math.min(20, Math.trunc(value)))
 }
 
+function needsBox(categoryName: string): boolean {
+  return BOXED_CATEGORY_NAMES.has(categoryName.trim().toLocaleLowerCase('bg-BG'))
+}
+
 export function createOrderLines(menu: Menu, quantities: Quantities): OrderLine[] {
-  const items = new Map<string, MenuItem>()
-  menu.categories.forEach((category) => category.items.forEach((item) => items.set(item.id, item)))
+  const items = new Map<string, { item: MenuItem; boxed: boolean }>()
+  menu.categories.forEach((category) => {
+    const boxed = needsBox(category.name)
+    category.items.forEach((item) => items.set(item.id, { item, boxed }))
+  })
 
   return Object.entries(quantities)
     .filter(([, quantity]) => quantity > 0)
     .map(([itemId, quantity]) => {
-      const item = items.get(itemId)
-      if (!item) throw new Error(`Unknown item id: ${itemId}`)
+      const entry = items.get(itemId)
+      if (!entry) throw new Error(`Unknown item id: ${itemId}`)
+      const { item, boxed } = entry
       const safeQuantity = clampQuantity(quantity)
       return {
         itemId,
@@ -51,8 +69,19 @@ export function createOrderLines(menu: Menu, quantities: Quantities): OrderLine[
         quantity: safeQuantity,
         unitPriceCents: item.priceCents,
         lineTotalCents: item.priceCents * safeQuantity,
+        boxCount: boxed ? safeQuantity : 0,
       }
     })
+}
+
+export function calculateTotals(lines: OrderLine[]): OrderTotals {
+  const boxCount = lines.reduce((sum, line) => sum + line.boxCount, 0)
+  const boxesCents = boxCount * BOX_FEE_CENTS
+  return {
+    boxCount,
+    boxesCents,
+    totalCents: lines.reduce((sum, line) => sum + line.lineTotalCents, boxesCents),
+  }
 }
 
 export function createOrderSummary(
@@ -68,7 +97,7 @@ export function createOrderSummary(
     menuDate: menu.date,
     sourceUrl: menu.source.postUrl,
     lines,
-    totalCents: lines.reduce((sum, line) => sum + line.lineTotalCents, 0),
+    ...calculateTotals(lines),
   }
 }
 
@@ -80,6 +109,7 @@ export function summaryToText(summary: OrderSummary): string {
       (line) =>
         `${line.quantity} × ${line.name}${line.portion ? ` (${line.portion})` : ''} — ${formatEuro(line.lineTotalCents)}`,
     ),
+    ...(summary.boxCount > 0 ? [`${summary.boxCount} × Кутия — ${formatEuro(summary.boxesCents)}`] : []),
     '',
     `Общо: ${formatEuro(summary.totalCents)}`,
   ]
