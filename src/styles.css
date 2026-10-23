@@ -118,6 +118,9 @@ button:focus-visible, a:focus-visible, input:focus-visible, textarea:focus-visib
 .basket-line-copy { min-width: 0; line-height: 1.4; }
 .basket-line-total { color: var(--orange-dark); font-weight: 800; white-space: nowrap; }
 .basket-line-actions { display: flex; grid-column: 1 / -1; gap: 1rem; align-items: center; justify-content: space-between; }
+.basket-boxes { display: flex; align-items: baseline; justify-content: space-between; padding: .8rem 0 0; font-size: .78rem; }
+.basket-boxes small { margin-left: .35rem; color: var(--muted); font-size: .7rem; }
+.basket-boxes strong { color: var(--orange-dark); font-weight: 800; white-space: nowrap; }
 .basket-total { display: flex; align-items: baseline; justify-content: space-between; padding: 1rem 0; border-bottom: 1px solid var(--line); }
 .basket-total span { font-size: .82rem; font-weight: 800; text-transform: uppercase; letter-spacing: .08em; }
 .basket-total strong { color: var(--orange-dark); font: 600 1.7rem Georgia, serif; }

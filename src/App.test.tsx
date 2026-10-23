@@ -446,10 +446,13 @@ describe('interactive menu', () => {
     await user.click(screen.getByRole('button', { name: 'Добави Пилешко филе' }))
 
     expect(screen.getByLabelText('Избрано количество: 2')).toHaveTextContent('2')
-    expect(screen.getAllByText(/10,50\s*€/).length).toBeGreaterThan(0)
+    expect(screen.getAllByText(/10,80\s*€/).length).toBeGreaterThan(0)
+    const basket = within(screen.getByRole('complementary', { name: 'Обобщение на избора' }))
+    expect(basket.getByText(/3 × 0,10\s*€/)).toBeInTheDocument()
+    expect(basket.getByText(/^0,30\s*€$/)).toBeInTheDocument()
 
     await user.click(screen.getByRole('button', { name: 'Намали Пилешка супа' }))
-    expect(screen.getAllByText(/7,80\s*€/).length).toBeGreaterThan(0)
+    expect(screen.getAllByText(/8,00\s*€/).length).toBeGreaterThan(0)
   })
 
   it('stops incrementing at the twenty-item limit', async () => {
@@ -461,7 +464,7 @@ describe('interactive menu', () => {
 
     expect(add).toBeDisabled()
     expect(screen.getByLabelText('Избрано количество: 20')).toHaveTextContent('20')
-    expect(screen.getAllByText(/54,00\s*€/).length).toBeGreaterThan(0)
+    expect(screen.getAllByText(/56,00\s*€/).length).toBeGreaterThan(0)
   })
 
   it.each([0, 1])('edits and removes basket lines in basket view %i, updating the menu, totals, copy, and saved draft', async (view) => {
@@ -477,7 +480,7 @@ describe('interactive menu', () => {
 
     await user.click(basket.getByRole('button', { name: 'Добави Пилешка супа в избора' }))
     expect(screen.getByLabelText('Избрано количество: 2')).toHaveTextContent('2')
-    expect(basket.getByText(/10,50\s*€/)).toBeInTheDocument()
+    expect(basket.getByText(/10,80\s*€/)).toBeInTheDocument()
     await user.click(basket.getByRole('button', { name: 'Намали Пилешка супа в избора' }))
     expect(within(screen.getByLabelText('Количество за Пилешка супа')).getByLabelText('Избрано количество: 1')).toHaveTextContent('1')
     await user.click(basket.getByRole('button', { name: 'Премахни Пилешко филе от избора' }))
@@ -495,6 +498,7 @@ describe('interactive menu', () => {
     await user.click(basket.getByRole('button', { name: 'Намали Пилешка супа в избора' }))
     expect(basket.getByText('Добави нещо вкусно от менюто.')).toBeInTheDocument()
     expect(basket.getByText(/0,00\s*€/)).toBeInTheDocument()
+    expect(basket.queryByText('Кутии')).not.toBeInTheDocument()
     if (view === 1) expect(basket.getByRole('heading', { name: 'Обядът ти' })).toHaveFocus()
   })
 
@@ -506,7 +510,8 @@ describe('interactive menu', () => {
     await user.click(basket.getByRole('button', { name: 'Добави Пилешка супа в избора' }))
     expect(basket.getByRole('button', { name: 'Добави Пилешка супа в избора' })).toBeDisabled()
     expect(screen.getByRole('button', { name: 'Добави Пилешка супа' })).toBeDisabled()
-    expect(basket.getAllByText(/54,00\s*€/)).toHaveLength(2)
+    expect(basket.getByText(/^54,00\s*€$/)).toBeInTheDocument()
+    expect(basket.getByText(/^56,00\s*€$/)).toBeInTheDocument()
   })
 
   it('restores quantities, name, and note after clearing, and expires undo after a new selection', async () => {
@@ -816,7 +821,8 @@ describe('interactive menu', () => {
     const basket = within(screen.getByRole('complementary', { name: 'Обобщение на избора' }))
     expect(basket.queryByText('Пилешко филе')).not.toBeInTheDocument()
     expect(screen.getByLabelText('Избрано количество: 2')).toHaveTextContent('2')
-    expect(basket.getAllByText(/6,00\s*€/)).toHaveLength(2)
+    expect(basket.getByText(/^6,00\s*€$/)).toBeInTheDocument()
+    expect(basket.getByText(/^6,20\s*€$/)).toBeInTheDocument()
     await user.click(basket.getByRole('button', { name: /Копирай избора/ }))
     expect(writeText).toHaveBeenCalledWith(expect.stringContaining('2 × Пилешка супа'))
     expect(writeText.mock.calls[0][0]).not.toContain('Пилешко филе')
