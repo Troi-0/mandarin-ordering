@@ -171,9 +171,28 @@ const TRANSIENT_HTTP_STATUSES = new Set([408, 429, 500, 502, 503, 504])
 const FALLBACK_HTTP_STATUSES = new Set([429, 500, 502, 503, 504])
 
 export class GeminiHttpError extends Error {
+  readonly quota: string | undefined
+
   constructor(public readonly status: number, body: string) {
     super(`Free Gemini request failed (${status}): ${body.slice(0, 400)}`)
+    this.quota = status === 429 ? describeQuota(body) : undefined
   }
+}
+
+export class GeminiTimeoutError extends Error {
+  constructor(cause: unknown) {
+    super('Free Gemini request failed after transient network errors', { cause })
+  }
+}
+
+// A model that keeps timing out is as unavailable as one that keeps returning
+// 503. Other network failures stay on the runner's side and do not fall back.
+function fallbackReason(error: unknown): string | undefined {
+  if (error instanceof GeminiTimeoutError) return 'request timeout'
+  if (!(error instanceof GeminiHttpError) || !FALLBACK_HTTP_STATUSES.has(error.status)) {
+    return undefined
+  }
+  return error.quota ? `${error.status}, ${error.quota}` : String(error.status)
 }
 
 export function createProductionGeminiSession() {
@@ -190,11 +209,10 @@ export function createProductionGeminiSession() {
           return { value: await operation(config), model: config.model }
         } catch (error) {
           const next = PRODUCTION_GEMINI_CONFIGS[configIndex + 1]
-          if (!(error instanceof GeminiHttpError)
-            || !FALLBACK_HTTP_STATUSES.has(error.status)
-            || !next) throw error
+          const reason = fallbackReason(error)
+          if (!reason || !next) throw error
           process.stdout.write(
-            `Gemini ${config.model} remained unavailable (${error.status}); falling back to ${next.model}\n`,
+            `Gemini ${config.model} remained unavailable (${reason}); falling back to ${next.model}\n`,
           )
           configIndex += 1
         }
@@ -270,21 +288,49 @@ function retryAfterMs(response: Response): number | undefined {
   return Math.min(Math.max(0, retryAt - Date.now()), MAX_RETRY_AFTER_MS)
 }
 
-function isDailyQuotaExceeded(body: string): boolean {
+interface QuotaViolation {
+  quotaId: string
+  quotaValue?: unknown
+}
+
+function quotaViolations(body: string): QuotaViolation[] {
   try {
     const payload = JSON.parse(body) as {
       error?: {
         details?: Array<{
-          violations?: Array<{ quotaId?: string }>
+          violations?: Array<{ quotaId?: unknown; quotaValue?: unknown }>
         }>
       }
     }
-    return payload.error?.details?.some((detail) => detail.violations?.some(
-      (violation) => violation.quotaId?.includes('PerDay'),
-    )) ?? false
+    return payload.error?.details
+      ?.flatMap((detail) => detail.violations ?? [])
+      .filter((violation): violation is QuotaViolation => typeof violation.quotaId === 'string')
+      ?? []
   } catch {
-    return false
+    return []
   }
+}
+
+function isDailyQuotaExceeded(body: string): boolean {
+  return quotaViolations(body).some((violation) => violation.quotaId.includes('PerDay'))
+}
+
+// Names the quota and limit behind a 429 so the log shows which free-tier limit
+// ran out. Actions logs are public and parse workflow commands, so only
+// identifier characters and a numeric limit from the response are kept.
+function describeQuota(body: string): string | undefined {
+  const quotas = quotaViolations(body).slice(0, 3).map((violation) => {
+    const id = violation.quotaId.replace(/[^\w.-]/g, '').slice(0, 100)
+    const limit = String(violation.quotaValue ?? '')
+    return /^\d{1,12}$/.test(limit) ? `${id} limit ${limit}` : id
+  })
+  return quotas.length > 0 ? `quota ${quotas.join(', ')}` : undefined
+}
+
+// fetch rejects with the AbortSignal.timeout() reason, a DOMException named TimeoutError.
+function isRequestTimeout(error: unknown): boolean {
+  return typeof error === 'object' && error !== null && 'name' in error
+    && error.name === 'TimeoutError'
 }
 
 function transientDelayMs(
@@ -361,6 +407,7 @@ export async function generateJson(
       })
     } catch (error) {
       if (attempt === retryDelaysMs.length) {
+        if (isRequestTimeout(error)) throw new GeminiTimeoutError(error)
         throw new Error('Free Gemini request failed after transient network errors', {
           cause: error,
         })
@@ -374,15 +421,17 @@ export async function generateJson(
     }
     if (response.ok) break
     const body = await response.text()
+    const httpError = new GeminiHttpError(response.status, body)
     const canRetry = TRANSIENT_HTTP_STATUSES.has(response.status)
       && !(response.status === 429 && isDailyQuotaExceeded(body))
       && attempt < retryDelaysMs.length
     if (!canRetry) {
-      throw new GeminiHttpError(response.status, body)
+      throw httpError
     }
     const delayMs = transientDelayMs(response, attempt, retryDelaysMs)
+    const quota = httpError.quota ? ` (${httpError.quota})` : ''
     process.stdout.write(
-      `Free Gemini request returned transient ${response.status}; retrying in ${delayMs} ms\n`,
+      `Free Gemini request returned transient ${response.status}${quota}; retrying in ${delayMs} ms\n`,
     )
     await wait(delayMs)
   }
