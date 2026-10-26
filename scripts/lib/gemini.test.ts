@@ -24,7 +24,25 @@ afterEach(() => {
   vi.useRealTimers()
   vi.unstubAllEnvs()
   vi.unstubAllGlobals()
+  vi.restoreAllMocks()
 })
+
+function geminiJson(text: string): Response {
+  return new Response(JSON.stringify({
+    candidates: [{ content: { parts: [{ text }] } }],
+  }), { status: 200 })
+}
+
+function quotaResponse(quotaId: string, quotaValue: string): Response {
+  return new Response(JSON.stringify({
+    error: { details: [{ violations: [{ quotaId, quotaValue }] }] },
+  }), { status: 429 })
+}
+
+function capturedStdout(): () => string {
+  const write = vi.spyOn(process.stdout, 'write').mockImplementation(() => true)
+  return () => write.mock.calls.map(([chunk]) => String(chunk)).join('')
+}
 
 async function humanVerifiedTranscript(): Promise<ExtractedMenu> {
   const menu = menuSchema.parse(
@@ -272,6 +290,98 @@ describe('blind Gemini transcription comparison', () => {
 
     await expect(result).resolves.toEqual({ ok: true })
     expect(fetchMock).toHaveBeenCalledTimes(2)
+  })
+
+  it('falls back when a model exhausts its retries on a request timeout', async () => {
+    vi.stubEnv('GEMINI_API_KEY', 'test-key')
+    const stdout = capturedStdout()
+    const fetchMock = vi.fn()
+      .mockResolvedValueOnce(new Response('high demand', { status: 503 }))
+      .mockRejectedValueOnce(new DOMException('The operation was aborted due to timeout', 'TimeoutError'))
+      .mockResolvedValueOnce(geminiJson('{"ok":true}'))
+    vi.stubGlobal('fetch', fetchMock)
+
+    const result = await createProductionGeminiSession().run((config) => generateJson(
+      'read menu',
+      new Uint8Array([1]),
+      'image/jpeg',
+      {},
+      config,
+      { retryDelaysMs: [0] },
+    ))
+
+    expect(result).toEqual({ value: { ok: true }, model: 'gemini-3.7-flash' })
+    expect(fetchMock.mock.calls.map(([url]) => String(url))).toEqual([
+      expect.stringContaining('/gemini-3.8-flash:generateContent'),
+      expect.stringContaining('/gemini-3.8-flash:generateContent'),
+      expect.stringContaining('/gemini-3.7-flash:generateContent'),
+    ])
+    expect(stdout()).toContain(
+      'Gemini gemini-3.8-flash remained unavailable (request timeout); falling back to gemini-3.7-flash',
+    )
+  })
+
+  it('does not fall back when the runner cannot reach Gemini at all', async () => {
+    vi.stubEnv('GEMINI_API_KEY', 'test-key')
+    const fetchMock = vi.fn(async () => {
+      throw new TypeError('fetch failed')
+    })
+    vi.stubGlobal('fetch', fetchMock)
+
+    await expect(createProductionGeminiSession().run((config) => generateJson(
+      'read menu',
+      new Uint8Array([1]),
+      'image/jpeg',
+      {},
+      config,
+      { retryDelaysMs: [] },
+    ))).rejects.toThrow('Free Gemini request failed after transient network errors')
+    expect(fetchMock).toHaveBeenCalledOnce()
+  })
+
+  it('logs which quota a 429 hit when retrying and when falling back', async () => {
+    vi.stubEnv('GEMINI_API_KEY', 'test-key')
+    const stdout = capturedStdout()
+    const fetchMock = vi.fn()
+      .mockResolvedValueOnce(quotaResponse('GenerateRequestsPerMinutePerProjectPerModel-FreeTier', '5'))
+      .mockResolvedValueOnce(quotaResponse('GenerateRequestsPerDayPerProjectPerModel-FreeTier', '20'))
+      .mockResolvedValueOnce(geminiJson('{"ok":true}'))
+    vi.stubGlobal('fetch', fetchMock)
+
+    const result = await createProductionGeminiSession().run((config) => generateJson(
+      'read menu',
+      new Uint8Array([1]),
+      'image/jpeg',
+      {},
+      config,
+      { retryDelaysMs: [0, 0] },
+    ))
+
+    expect(result.model).toBe('gemini-3.7-flash')
+    expect(fetchMock).toHaveBeenCalledTimes(3)
+    expect(stdout()).toContain(
+      'Free Gemini request returned transient 429 '
+        + '(quota GenerateRequestsPerMinutePerProjectPerModel-FreeTier limit 5); retrying in 0 ms',
+    )
+    expect(stdout()).toContain(
+      'Gemini gemini-3.8-flash remained unavailable '
+        + '(429, quota GenerateRequestsPerDayPerProjectPerModel-FreeTier limit 20); '
+        + 'falling back to gemini-3.7-flash',
+    )
+  })
+
+  it('keeps quota text from a 429 response to identifier characters', () => {
+    const error = new GeminiHttpError(429, JSON.stringify({
+      error: {
+        details: [{
+          violations: [{ quotaId: 'PerDay\n::error::injected', quotaValue: '20\n::warning::' }],
+        }],
+      },
+    }))
+
+    expect(error.quota).toBe('quota PerDayerrorinjected')
+    expect(new GeminiHttpError(429, 'not json').quota).toBeUndefined()
+    expect(new GeminiHttpError(503, 'high demand').quota).toBeUndefined()
   })
 
   it('does not retry permanent Gemini client errors', async () => {

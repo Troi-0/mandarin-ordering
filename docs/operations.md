@@ -21,12 +21,14 @@ database, analytics, payment SDK, hosted font, or order-submission endpoint.
 Production starts with `gemini-3.8-flash` at low thinking and high per-image
 resolution. Each model can retry a transient request up to 20 times. A 429 that
 explicitly reports a per-day quota skips the remaining retries for that model.
-If the retries end in Gemini 429, 500, 502, 503, or 504,
-the same import tries `gemini-3.7-flash` with those settings, then
+If the retries end in Gemini 429, 500, 502, 503, or 504, or in a request that
+timed out, the same import tries `gemini-3.7-flash` with those settings, then
 `gemini-3.6-flash` with its former production request shape. A successful
 fallback remains selected for later passes on that image. Permanent API errors,
-malformed responses, and transcription uncertainty do not trigger model
-fallback. All three exact models use the same billing-disabled free-tier project;
+malformed responses, other network failures, and transcription uncertainty do
+not trigger model fallback. Retry and fallback log lines for a 429 name the
+reported quota ID and its limit, so a per-minute limit can be told apart from
+an exhausted daily quota. All three exact models use the same billing-disabled free-tier project;
 there is no paid fallback. Manual benchmarks still test each configuration
 separately. The importer sends only the already-public restaurant menu image to
 Gemini. It never receives visitor names, selections, or browser data.
@@ -490,7 +492,8 @@ before assuming the importer is at fault.
 - Production Gemini calls retry transient network failures plus 408, 429, and
   supported 5xx responses at most 20 times per model with bounded exponential
   backoff, jitter, and `Retry-After` support. A structured per-day quota 429
-  moves to the next free model without further calls to that model. Benchmarks
+  moves to the next free model without further calls to that model, and so do
+  retries that end in a request timeout. Benchmarks
   remain fail-fast; permanent errors and exhausted fallback models fail closed.
   The import jobs allow up to four hours so their configured retry sequence can
   complete even when responses approach the per-request timeout.
