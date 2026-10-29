@@ -1,21 +1,21 @@
 {
   "status": "ready",
   "menu": {
-    "date": "2026-10-28",
+    "date": "2026-10-29",
     "restaurant": "Mandarin House",
     "currency": "EUR",
     "source": {
       "pageId": "100063668642218",
-      "postId": "1767904722008466",
-      "postUrl": "https://www.facebook.com/permalink.php?story_fbid=1767904722008466&id=100063668642218",
-      "publishedAt": "2026-10-28T06:30:04.000Z",
-      "imageSha256": "e3eb269a49d39d23e7834857a4c580f54933a1310c6a1e0cb2137355e2b750c6"
+      "postId": "1769200328545572",
+      "postUrl": "https://www.facebook.com/permalink.php?story_fbid=1769200328545572&id=100063668642218",
+      "publishedAt": "2026-10-29T06:30:08.000Z",
+      "imageSha256": "533ffd97f60a68d4f459b3889b6b5b51387a8c786090f87cfa9269faa9d5770d"
     },
-    "importedAt": "2026-10-28T07:20:59.283Z",
+    "importedAt": "2026-10-29T06:41:38.041Z",
     "importMethod": "facebook",
     "validation": {
-      "extractedBy": "gemini-3.8-flash",
-      "verifiedBy": "gemini-3.8-flash:blind-transcription",
+      "extractedBy": "gemini-3.6-flash",
+      "verifiedBy": "gemini-3.6-flash:blind-transcription",
       "uncertain": false
     },
     "categories": [
@@ -24,14 +24,14 @@
         "name": "СУПИ",
         "items": [
           {
-            "id": "item-e48f36f49572",
-            "name": "Телешко варено",
+            "id": "item-1f4333eb4d73",
+            "name": "Рибена чорба",
             "portion": "350 мл",
             "priceCents": 300
           },
           {
-            "id": "item-de77740719f5",
-            "name": "Супа от горски гъби с ориз",
+            "id": "item-7233ad3cde05",
+            "name": "Леща чорба",
             "portion": "350 мл",
             "priceCents": 270
           },
@@ -48,64 +48,64 @@
         "name": "ОСНОВНИ",
         "items": [
           {
-            "id": "item-fbe7609af877",
-            "name": "Панирано пилешко филе с корнфлейкс, с гарнитура",
+            "id": "item-a3fbe3a4c625",
+            "name": "Панирано пилешко филе със сусам, с гарнитура",
             "portion": "350 г",
             "priceCents": 510
           },
           {
-            "id": "item-e7181ca325e3",
-            "name": "Късчета от пилешко филе с териаки сос, с гарнитура ориз",
+            "id": "item-e12962532dd2",
+            "name": "Порция пилешки гирос, ь с ½ пърленка, тирокафтери и гарнитура",
+            "portion": "350 г",
+            "priceCents": 610
+          },
+          {
+            "id": "item-b96700f2568b",
+            "name": "Винен кебап със свинска мръвка, с гарнитура ориз или картофено пюре",
+            "portion": "350 г",
+            "priceCents": 490
+          },
+          {
+            "id": "item-9380fddb50f0",
+            "name": "Царски зелеви сарми с кълцан свински врат",
             "portion": "350 г",
             "priceCents": 510
           },
           {
-            "id": "item-b3c527020f48",
-            "name": "Карета от свинско контра филе на плоча, с гарнитура",
+            "id": "item-a639b19a9f32",
+            "name": "Агнешка дроб-сарма",
             "portion": "350 г",
-            "priceCents": 510
+            "priceCents": 480
           },
           {
-            "id": "item-c24da2630e7f",
-            "name": "Свински врат със сметанов сос с пушено сирене, с гарнитура",
+            "id": "item-97d24d3e1b5d",
+            "name": "Гнездо от мляно месо с бекон, моцарела и яйце, с гарнитура",
             "portion": "350 г",
-            "priceCents": 520
+            "priceCents": 480
           },
           {
-            "id": "item-f21256036fc0",
-            "name": "Цариградски кюфтенца, върху картофено пюре със сос демиглас",
+            "id": "item-24f0369753e7",
+            "name": "Чушка бюрек, с млечен сос и гарнитура",
             "portion": "350 г",
-            "priceCents": 470
+            "priceCents": 430
           },
           {
-            "id": "item-4461dd9d4c9a",
-            "name": "Шницел от мляно месо, с гарнитура",
+            "id": "item-099fcbcc986d",
+            "name": "Поширани яйца, върху качамак със сирне",
             "portion": "350 г",
-            "priceCents": 470
+            "priceCents": 430
           },
           {
-            "id": "item-be01d35003fd",
-            "name": "Кашкавал пане, с гарнитура",
-            "portion": "350 г",
-            "priceCents": 510
-          },
-          {
-            "id": "item-2206185530a8",
-            "name": "Пълнен батат, с мус от сирене, с гарнитура",
-            "portion": "350 г",
-            "priceCents": 510
-          },
-          {
-            "id": "item-72dc51ce5b4d",
-            "name": "Ориз с праз лук , маслини и домати на фурна",
+            "id": "item-5c44771d54bf",
+            "name": "Удон нудли със зеленчуци и сусам, по азиатски",
             "portion": "350 г",
             "priceCents": 410
           },
           {
-            "id": "item-aa32219e248f",
-            "name": "Филе от тилапия, с пармезанова коричка, с гарнитура",
+            "id": "item-7e9011c89716",
+            "name": "Филе от сьомга на скара, с гарнитура",
             "portion": "350 г",
-            "priceCents": 720
+            "priceCents": 810
           }
         ]
       },
@@ -198,32 +198,27 @@
         "name": "ДЕСЕРТ",
         "items": [
           {
-            "id": "item-5f07d6f2f521",
-            "name": "Шоколадова торта „ Сладък салам“",
-            "priceCents": 280
-          },
-          {
-            "id": "item-27f491406703",
-            "name": "Панакота с карамелизирани круши",
+            "id": "item-92a3f5728b13",
+            "name": "Домашна бисквитена торта",
             "priceCents": 290
           },
           {
-            "id": "item-8f0b7d691665",
+            "id": "item-42a2892ed603",
             "name": "Мляко с ориз и канела",
             "priceCents": 190
           },
           {
-            "id": "item-f6862696c86d",
+            "id": "item-a4dd1fc8487a",
             "name": "Протеинов шоколадов мус",
             "priceCents": 290
           },
           {
-            "id": "item-402baa5c0005",
+            "id": "item-0d54f91b36c6",
             "name": "Млечен пудинг с чиа и плодове",
             "priceCents": 205
           },
           {
-            "id": "item-36eb3e5d5aba",
+            "id": "item-a23aa7c89702",
             "name": "Печена тиква с мед и орехи",
             "priceCents": 210
           }
